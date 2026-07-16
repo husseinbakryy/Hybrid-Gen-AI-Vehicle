@@ -7,8 +7,8 @@ Hybrid-Gen-AI-Vehicle combines a synthetic trip simulator with an interactive da
 - `Simulator/`: Python package for synthetic trip generation, diagnostics, labeling, and ML prep.
 - `Dashboard/`: PyQt-based UI for trip setup, mode recommendations, and visual summaries.
 - `Backend/`: Reserved for service/API layer (currently empty).
-- `Data/`: Reserved for curated datasets and exports (currently empty).
-- `Models/`: Reserved for trained model artifacts and metadata (currently empty).
+- `Data/`: Shared datasets (currently includes `synthetic_trips.csv`).
+- `Models/`: Modular training and inference pipeline for five prediction models.
 
 ## Prerequisites
 
@@ -41,6 +41,14 @@ cd Simulator
 uv run pytest -q
 ```
 
+### 4) Run the Models Pipeline
+
+```powershell
+cd Models
+uv sync
+uv run python synthetic_trip_capgemini.py
+```
+
 ## Simulator Notes
 
 - Main package source is under `Simulator/simulator/`.
@@ -53,6 +61,13 @@ uv run pytest -q
 - Main entry point is `Dashboard/main.py`.
 - UI components live under `Dashboard/widgets/`.
 - `Dashboard/.gitignore` is configured for Python and local environment artifacts.
+
+## Models Notes
+
+- Dataset is loaded from `Data/synthetic_trips.csv` by default.
+- Pipeline modules are under `Models/pipeline/` with one trainer file per model.
+- Trained artifacts are written to `Models/artifacts/`.
+- `Models/.gitignore` is configured to ignore generated artifacts and local files.
 
 ## Recommended Next Steps
 

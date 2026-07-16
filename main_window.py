@@ -1,46 +1,58 @@
 import random
-from PyQt6.QtWidgets import QMainWindow, QWidget, QGridLayout, QVBoxLayout, QFrame
+from PyQt6.QtWidgets import QWidget, QGridLayout, QVBoxLayout
 from PyQt6.QtCore import QTimer
 
 from widgets import (
-    Speedometer, TripProgressPanel, TripSetupForm, StatCardsPanel, RecommendationPanel
+    Speedometer, TripProgressPanel, TripSetupForm, StatCardsPanel, RecommendationPanel,
+    Header
 )
+from widgets.card import Card
+from theme import Colors
 import trip_logic
 
 
-class MainWindow(QMainWindow):
+class DashboardView(QWidget):
+    """All the actual dashboard content (speedometer, panels, form). Used
+    to be the QMainWindow's central widget directly - now it gets nested
+    inside DashboardContainer's floating panel instead. Nothing about its
+    internal behavior changed, just what it's a child of."""
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Hybrid Trip Planner")
-        self.resize(900, 700)
 
-        central = QWidget()
-        self.setCentralWidget(central)
-
-        outer = QGridLayout(central)
-        outer.setContentsMargins(16, 16, 16, 16)
+        outer = QGridLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(12)
 
-        speedo_card = QFrame()
-        speedo_card.setObjectName("card")
-        speedo_layout = QVBoxLayout(speedo_card)
+        self.header = Header()
+
+        speedo_card = Card("Speed", Colors.EV)
         self.speedometer = Speedometer()
-        speedo_layout.addWidget(self.speedometer)
+        speedo_card.add_widget(self.speedometer)
 
         self.progress_panel = TripProgressPanel()
         self.stat_cards = StatCardsPanel()
         self.recommendation = RecommendationPanel()
 
-        left_col = QVBoxLayout()
-        left_col.addWidget(speedo_card)
-        left_col.addWidget(self.progress_panel)
-        left_col.addWidget(self.stat_cards)
-        left_col.addWidget(self.recommendation)
+        # Bottom group: everything except the speedometer, stacked together
+        bottom_group = QVBoxLayout()
+        bottom_group.addWidget(self.progress_panel)
+        bottom_group.addWidget(self.stat_cards)
+        bottom_group.addWidget(self.recommendation)
+        bottom_group.addStretch()
 
         self.trip_form = TripSetupForm()
 
-        outer.addLayout(left_col, 0, 0)
-        outer.addWidget(self.trip_form, 0, 1)
+        outer.addWidget(self.header, 0, 0, 1, 2)
+        outer.addWidget(speedo_card, 1, 0)
+        outer.addLayout(bottom_group, 2, 0)
+        # Trip Setup spans both rows on the right - a persistent sidebar
+        # while the speedometer + bottom group stack up on the left
+        outer.addWidget(self.trip_form, 1, 1, 2, 1)
+
+        # Give the speedometer row more room than the bottom group row
+        outer.setRowStretch(1, 1)
+        outer.setRowStretch(2, 2)
 
         self.trip_form.speedChanged.connect(self.speedometer.setSpeed)
         self.trip_form.distanceChanged.connect(

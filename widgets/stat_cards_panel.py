@@ -1,42 +1,58 @@
-from PyQt6.QtWidgets import QFrame, QGridLayout, QVBoxLayout, QLabel
+"""
+Four stat tiles (Cost, Time, CO2, Range Left), each its own accent-colored
+Card - Cost/Range in EV teal, Time in gas orange, CO2 in green.
+
+StatCardsPanel itself stays a plain container with the SAME public methods
+as before (set_stats / reset_stats), so main_window.py doesn't need any
+changes - only the internals here changed.
+"""
+
+from PyQt6.QtWidgets import QWidget, QGridLayout, QLabel
 from PyQt6.QtCore import Qt
 
+from widgets.card import Card
+from theme import Colors
 
-class StatCardsPanel(QFrame):
-    """Four small metric tiles: cost, time, CO2, range remaining."""
 
+class _StatTile(Card):
+    def __init__(self, title: str, accent_color):
+        super().__init__(title, accent_color)
+
+        self.value_label = QLabel("--")
+        self.value_label.setObjectName("LargeValue")
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.add_widget(self.value_label)
+
+    def set_value(self, text: str):
+        self.value_label.setText(text)
+
+    def reset(self):
+        self.value_label.setText("--")
+
+
+class StatCardsPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("card")
         layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        self.value_labels = {}
-        specs = [("COST", "cost", "$--"), ("TIME", "time", "--"),
-                 ("CO2", "co2", "--"), ("RANGE LEFT", "range", "--")]
-        for col, (title, key, default) in enumerate(specs):
-            tile = QFrame()
-            tile.setObjectName("statTile")
-            tile_layout = QVBoxLayout(tile)
-            title_lbl = QLabel(title)
-            title_lbl.setStyleSheet("color: #6a6a73; font-size: 11px;")
-            title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            value_lbl = QLabel(default)
-            value_lbl.setStyleSheet("color: #e8e8ec; font-size: 16px; font-weight: 600;")
-            value_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            tile_layout.addWidget(title_lbl)
-            tile_layout.addWidget(value_lbl)
-            layout.addWidget(tile, 0, col)
-            self.value_labels[key] = value_lbl
+        self.cost_tile = _StatTile("Cost", Colors.EV)
+        self.time_tile = _StatTile("Time", Colors.GAS)
+        self.co2_tile = _StatTile("CO2", Colors.GREEN)
+        self.range_tile = _StatTile("Range Left", Colors.EV)
+
+        layout.addWidget(self.cost_tile, 0, 0)
+        layout.addWidget(self.time_tile, 0, 1)
+        layout.addWidget(self.co2_tile, 0, 2)
+        layout.addWidget(self.range_tile, 0, 3)
 
     def set_stats(self, cost: float, time_str: str, co2: float, range_left: float):
-        self.value_labels["cost"].setText(f"${cost:.2f}")
-        self.value_labels["time"].setText(time_str)
-        self.value_labels["co2"].setText(f"{co2:.1f}kg")
-        self.value_labels["range"].setText(f"{round(range_left)} mi")
+        self.cost_tile.set_value(f"${cost:.2f}")
+        self.time_tile.set_value(time_str)
+        self.co2_tile.set_value(f"{co2:.1f}kg")
+        self.range_tile.set_value(f"{round(range_left)} mi")
 
     def reset_stats(self):
-        self.value_labels["cost"].setText("$--")
-        self.value_labels["time"].setText("--")
-        self.value_labels["co2"].setText("--")
-        self.value_labels["range"].setText("--")
+        for tile in (self.cost_tile, self.time_tile, self.co2_tile, self.range_tile):
+            tile.reset()

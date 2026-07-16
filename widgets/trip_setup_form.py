@@ -1,95 +1,95 @@
+"""
+Vehicle, distance, speed, temperature, traffic, driving style, seats, and
+charging stops - built on the Card base class. Public interface (signals,
+getters) is UNCHANGED, so main_window.py needs no edits.
+"""
+
 from PyQt6.QtWidgets import (
-    QFrame, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpinBox, QSlider,
-    QPushButton, QListWidget
+    QHBoxLayout, QLabel, QComboBox, QSpinBox, QSlider, QPushButton, QListWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from widgets.card import Card
 from widgets.car_seat_selector import CarSeatSelector
+from theme import Colors
 
 
-class TripSetupForm(QFrame):
-    """Vehicle, distance, speed, temperature, traffic, driving style, seats,
-    and charging stops."""
-
+class TripSetupForm(Card):
     speedChanged = pyqtSignal(int)
     distanceChanged = pyqtSignal(int)
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
+        super().__init__("Trip Setup", Colors.EV)
         self.setFixedWidth(260)
-        layout = QVBoxLayout(self)
 
-        title = QLabel("TRIP SETUP")
-        title.setStyleSheet("color: #8a8a93; font-size: 11px; letter-spacing: 1px;")
-        layout.addWidget(title)
-
-        layout.addWidget(self._label("Vehicle"))
+        self.add_widget(self._label("Vehicle"))
         self.vehicle_combo = QComboBox()
         self.vehicle_combo.addItem("Toyota Prius (44mi EV)", 44)
         self.vehicle_combo.addItem("Toyota RAV4 Hybrid (42mi EV)", 42)
         self.vehicle_combo.addItem("Lexus NX350h (37mi EV)", 37)
-        layout.addWidget(self.vehicle_combo)
+        self.add_widget(self.vehicle_combo)
 
-        layout.addWidget(self._label("Distance (mi)"))
+        self.add_widget(self._label("Distance (mi)"))
         self.distance_spin = QSpinBox()
         self.distance_spin.setRange(1, 400)
         self.distance_spin.setValue(65)
-        layout.addWidget(self.distance_spin)
+        self.add_widget(self.distance_spin)
 
         self.speed_value_label = self._label("Avg speed: 45 mph")
-        layout.addWidget(self.speed_value_label)
+        self.add_widget(self.speed_value_label)
         self.speed_slider = QSlider(Qt.Orientation.Horizontal)
-        self.speed_slider.setRange(0, 80)
+        self.speed_slider.setRange(0, 120)
         self.speed_slider.setValue(45)
-        layout.addWidget(self.speed_slider)
+        self.add_widget(self.speed_slider)
 
         self.temp_value_label = self._label("Temperature: 20C")
-        layout.addWidget(self.temp_value_label)
+        self.add_widget(self.temp_value_label)
         self.temp_slider = QSlider(Qt.Orientation.Horizontal)
         self.temp_slider.setRange(-10, 42)
         self.temp_slider.setValue(20)
-        layout.addWidget(self.temp_slider)
+        self.add_widget(self.temp_slider)
 
-        layout.addWidget(self._label("Traffic"))
+        self.add_widget(self._label("Traffic"))
         self.traffic_combo = QComboBox()
         self.traffic_combo.addItems(["Low", "Medium", "High"])
         self.traffic_combo.setCurrentText("Medium")
-        layout.addWidget(self.traffic_combo)
+        self.add_widget(self.traffic_combo)
 
-        layout.addWidget(self._label("Driving style"))
+        self.add_widget(self._label("Driving style"))
         self.style_combo = QComboBox()
         self.style_combo.addItems(["Eco", "Normal", "Aggressive"])
         self.style_combo.setCurrentText("Normal")
-        layout.addWidget(self.style_combo)
+        self.add_widget(self.style_combo)
 
-        layout.addWidget(self._label("Passengers"))
+        self.add_widget(self._label("Passengers"))
         self.seat_selector = CarSeatSelector()
-        layout.addWidget(self.seat_selector)
+        self.add_widget(self.seat_selector)
         self.pax_label = QLabel("1 passenger")
         self.pax_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.pax_label.setStyleSheet("color: #6a6a73; font-size: 11px;")
-        layout.addWidget(self.pax_label)
+        self.pax_label.setStyleSheet(
+            f"color: {Colors.TEXT_DISABLED.name()}; font-size: 11px;"
+        )
+        self.add_widget(self.pax_label)
 
         self.charging_stops: list[int] = []
 
-        layout.addWidget(self._label("Charging stops (mi)"))
+        self.add_widget(self._label("Charging stops (mi)"))
         stop_row = QHBoxLayout()
         self.stop_mile_spin = QSpinBox()
         self.stop_mile_spin.setRange(1, self.distance_spin.value() - 1)
         self.add_stop_btn = QPushButton("Add")
         stop_row.addWidget(self.stop_mile_spin)
         stop_row.addWidget(self.add_stop_btn)
-        layout.addLayout(stop_row)
+        self.add_layout(stop_row)
 
         self.stops_list = QListWidget()
         self.stops_list.setFixedHeight(64)
-        layout.addWidget(self.stops_list)
+        self.add_widget(self.stops_list)
 
         self.remove_stop_btn = QPushButton("Remove selected stop")
-        layout.addWidget(self.remove_stop_btn)
+        self.add_widget(self.remove_stop_btn)
 
-        layout.addStretch()
+        self.add_stretch()
 
         self.speed_slider.valueChanged.connect(self._on_speed_changed)
         self.distance_spin.valueChanged.connect(self._on_distance_changed)
@@ -102,7 +102,7 @@ class TripSetupForm(QFrame):
 
     def _label(self, text: str) -> QLabel:
         lbl = QLabel(text)
-        lbl.setStyleSheet("color: #6a6a73; font-size: 12px;")
+        lbl.setStyleSheet(f"color: {Colors.TEXT_DISABLED.name()}; font-size: 12px;")
         return lbl
 
     def _on_speed_changed(self, value: int):

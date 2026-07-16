@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import joblib
 import pandas as pd
@@ -32,8 +33,14 @@ def load_assets(artifact_dir: str | Path = ARTIFACT_DIR):
 
 
 
-def predict_trip(input_data_dict: dict, artifact_dir: str | Path = ARTIFACT_DIR):
-    preprocessor, models = load_assets(artifact_dir)
+def predict_trip_structured(
+    input_data_dict: dict[str, Any],
+    artifact_dir: str | Path = ARTIFACT_DIR,
+    preprocessor=None,
+    models=None,
+):
+    if preprocessor is None or models is None:
+        preprocessor, models = load_assets(artifact_dir)
 
     missing_features = [feature for feature in FEATURES if feature not in input_data_dict]
     if missing_features:
@@ -43,15 +50,30 @@ def predict_trip(input_data_dict: dict, artifact_dir: str | Path = ARTIFACT_DIR)
     transformed = preprocessor.transform(input_df)
 
     pred_mode = models["m1_recommended_mode"].predict(transformed)[0]
-    pred_fuel = models["m2_fuel_consumption"].predict(transformed)[0]
-    pred_battery = models["m3_battery_energy"].predict(transformed)[0]
-    pred_co2 = models["m4_co2_emissions"].predict(transformed)[0]
-    pred_cost = models["m5_trip_cost"].predict(transformed)[0]
+    pred_fuel = float(models["m2_fuel_consumption"].predict(transformed)[0])
+    pred_battery = float(models["m3_battery_energy"].predict(transformed)[0])
+    pred_co2 = float(models["m4_co2_emissions"].predict(transformed)[0])
+    pred_cost = float(models["m5_trip_cost"].predict(transformed)[0])
 
-    return {
-        "Recommended Driving Mode": pred_mode,
-        "Predicted Fuel Consumption": f"{pred_fuel:.2f} Liters",
-        "Predicted Battery Energy Used": f"{pred_battery:.2f} kWh",
-        "Predicted Carbon Footprint": f"{pred_co2:.2f} kg of CO2",
-        "Predicted Financial Trip Cost": f"${pred_cost:.2f} USD",
+    raw = {
+        "recommended_mode": str(pred_mode),
+        "fuel_used_l": pred_fuel,
+        "battery_used_kwh": pred_battery,
+        "co2_emissions_kg": pred_co2,
+        "trip_cost_usd": pred_cost,
     }
+
+    formatted = {
+        "Recommended Driving Mode": raw["recommended_mode"],
+        "Predicted Fuel Consumption": f"{raw['fuel_used_l']:.2f} Liters",
+        "Predicted Battery Energy Used": f"{raw['battery_used_kwh']:.2f} kWh",
+        "Predicted Carbon Footprint": f"{raw['co2_emissions_kg']:.2f} kg of CO2",
+        "Predicted Financial Trip Cost": f"${raw['trip_cost_usd']:.2f} USD",
+    }
+
+    return {"raw": raw, "formatted": formatted}
+
+
+
+def predict_trip(input_data_dict: dict, artifact_dir: str | Path = ARTIFACT_DIR):
+    return predict_trip_structured(input_data_dict, artifact_dir=artifact_dir)["formatted"]

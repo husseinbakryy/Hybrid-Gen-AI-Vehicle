@@ -1,0 +1,51 @@
+from pathlib import Path
+
+MODELS_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = MODELS_DIR.parent
+DEFAULT_DATA_PATH = REPO_ROOT / "Data" / "synthetic_trips.csv"
+ARTIFACT_DIR = MODELS_DIR / "artifacts"
+
+FEATURES = [
+    "make",
+    "model",
+    "powertrain_type",
+    "body_type",
+    "battery_capacity_kwh",
+    "usable_battery_kwh",
+    "fuel_tank_l",
+    "mass_kg",
+    "drag_coeff",
+    "frontal_area_m2",
+    "city",
+    "season",
+    "weather",
+    "ambient_temp_c",
+    "humidity",
+    "wind_speed_kmh",
+    "precipitation_mm",
+    "departure_hour",
+    "day_type",
+    "trip_purpose",
+    "road_type",
+    "traffic_level",
+    "distance_km",
+    "passengers",
+    "cargo_kg",
+]
+
+TARGET_MAP = {
+    "m1_recommended_mode": "recommended_mode",
+    "m2_fuel_consumption": "true_fuel_used_l",
+    "m3_battery_energy": "true_battery_used_kwh",
+    "m4_co2_emissions": "true_emissions",
+    "m5_trip_cost": "estimated_cost",
+}
+
+PREPROCESSOR_FILE = "total_trip_cost_preprocessor.joblib"
+MODEL_ASSETS = {
+    "m1_recommended_mode": "recommended_mode_rf.joblib",
+    "m2_fuel_consumption": "fuel_used_rf.joblib",
+    "m3_battery_energy": "electric_used_rf.joblib",
+    "m4_co2_emissions": "co2_emissions_rf.joblib",
+    "m5_trip_cost": "total_trip_cost_rf.joblib",
+}

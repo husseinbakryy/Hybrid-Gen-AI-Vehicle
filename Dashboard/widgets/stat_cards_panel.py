@@ -37,10 +37,10 @@ class StatCardsPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
 
-        self.cost_tile = _StatTile("Cost", Colors.EV)
-        self.time_tile = _StatTile("Time", Colors.GAS)
-        self.co2_tile = _StatTile("CO2", Colors.GREEN)
-        self.range_tile = _StatTile("Range Left", Colors.EV)
+        self.cost_tile = _StatTile("Cost", Colors.COST)
+        self.time_tile = _StatTile("Time", Colors.TIME)
+        self.co2_tile = _StatTile("CO2", Colors.CO2)
+        self.range_tile = _StatTile("Range Left", Colors.RANGE)
 
         layout.addWidget(self.cost_tile, 0, 0)
         layout.addWidget(self.time_tile, 0, 1)

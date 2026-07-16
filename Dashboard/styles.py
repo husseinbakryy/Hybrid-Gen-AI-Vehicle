@@ -1,15 +1,8 @@
 """
-Global Qt stylesheet, built from theme.py's design tokens rather than
-hardcoded values.
-
-Keeps our EXISTING selector names (#card, #statTile, #startBtn, etc.) so
-nothing visually changes and no other file needs editing yet. Also adds
-the new Card-based selectors (#Dashboard, #Card, #Title, #SectionTitle,
-#Value, #LargeValue, #Muted, #Secondary) so future widgets can use them
-immediately once we migrate to the Card base class (see widgets/card.py).
+Global Qt stylesheet built from the shared theme tokens.
 """
 
-from theme import Colors, Fonts, Dashboard, Cards, Buttons
+from theme import Colors, Fonts, Dashboard, Cards
 
 
 def get_dark_style() -> str:
@@ -17,7 +10,6 @@ def get_dark_style() -> str:
 QMainWindow {{ background-color: {Colors.DASHBOARD.name()}; }}
 QLabel {{ color: {Colors.TEXT.name()}; }}
 
-/* --- existing selectors (unchanged visually) --- */
 QFrame#card {{
     background-color: {Colors.CARD.name()};
     border: 1px solid {Colors.BORDER.name()};
@@ -30,23 +22,36 @@ QFrame#statTile {{
 QPushButton {{
     background-color: transparent;
     color: {Colors.TEXT_SECONDARY.name()};
-    border: 1px solid #333;
-    border-radius: 6px;
-    padding: 8px;
+    border: 1px solid {Colors.BORDER.name()};
+    border-radius: 8px;
+    padding: 8px 12px;
 }}
-QPushButton:hover {{ background-color: {Colors.CARD_HOVER.name()}; }}
+QPushButton:hover {{
+    background-color: {Colors.CARD_HOVER.name()};
+    color: {Colors.TEXT.name()};
+}}
 QPushButton#startBtn {{
-    background-color: {Colors.EV.name()};
-    color: #04342c;
-    border: none;
+    background-color: {Colors.RANGE.name()};
+    color: {Colors.TEXT.name()};
+    border: 1px solid {Colors.ACCENT_DARK.name()};
     font-weight: 600;
 }}
-QPushButton#startBtn:hover {{ background-color: {Colors.EV_GLOW.name()}; }}
+QPushButton#startBtn:hover {{
+    background-color: {Colors.ACCENT_DARK.name()};
+}}
+QPushButton#Secondary {{
+    background-color: {Colors.CARD_HOVER.name()};
+    color: {Colors.TEXT.name()};
+    border: 1px solid {Colors.BORDER.name()};
+}}
+QPushButton#Secondary:hover {{
+    background-color: {Colors.CARD.name()};
+}}
 QComboBox, QSpinBox {{
     background-color: {Colors.CARD_HOVER.name()};
     color: {Colors.TEXT.name()};
-    border: 1px solid #333;
-    border-radius: 4px;
+    border: 1px solid {Colors.BORDER.name()};
+    border-radius: 6px;
     padding: 4px;
 }}
 QSlider::groove:horizontal {{
@@ -55,14 +60,12 @@ QSlider::groove:horizontal {{
     border-radius: 2px;
 }}
 QSlider::handle:horizontal {{
-    background: {Colors.EV.name()};
+    background: {Colors.RANGE.name()};
     width: 14px;
     height: 14px;
     margin: -6px 0;
     border-radius: 7px;
 }}
-
-/* --- new Card-based selectors, ready for step 3 widget migration --- */
 QFrame#Dashboard {{
     background-color: {Colors.DASHBOARD.name()};
     border: {Dashboard.BORDER_WIDTH}px solid {Colors.BORDER.name()};
@@ -103,18 +106,6 @@ QLabel#Muted {{
     font-size: {Fonts.SMALL + 1}px;
     color: {Colors.TEXT_DISABLED.name()};
 }}
-QPushButton#Secondary {{
-    background-color: transparent;
-    color: {Colors.TEXT_SECONDARY.name()};
-    border: 1px solid {Colors.BORDER.name()};
-}}
-QPushButton#Secondary:hover {{
-    background-color: {Colors.CARD_HOVER.name()};
-    color: {Colors.TEXT.name()};
-}}
 """
 
-
-# Kept as a module-level constant so `from styles import DARK_STYLE` in
-# main.py keeps working unchanged.
 DARK_STYLE = get_dark_style()

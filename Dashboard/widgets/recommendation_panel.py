@@ -13,7 +13,7 @@ DEFAULT_TEXT = "Set up your trip and hit start to get a recommendation."
 
 class RecommendationPanel(Card):
     def __init__(self, parent=None):
-        super().__init__("AI Recommendation", Colors.EV)
+        super().__init__("AI Recommendation", Colors.AI)
 
         self.text_label = QLabel(DEFAULT_TEXT)
         self.text_label.setWordWrap(True)

@@ -19,15 +19,27 @@ class TripSetupForm(Card):
     distanceChanged = pyqtSignal(int)
 
     def __init__(self, parent=None):
-        super().__init__("Trip Setup", Colors.EV)
+        super().__init__("Trip Setup", Colors.RANGE)
         self.setFixedWidth(260)
 
-        self.add_widget(self._label("Vehicle"))
+        self.vehicle_label = QLabel()
+        self.vehicle_label.setStyleSheet(
+            f"""
+            QLabel {{
+                color: {Colors.TEXT_DISABLED.name()};
+                font-size: 12px;
+            }}
+            """
+        )
+        self.add_widget(self.vehicle_label)
+
         self.vehicle_combo = QComboBox()
         self.vehicle_combo.addItem("Toyota Prius (44mi EV)", 44)
         self.vehicle_combo.addItem("Toyota RAV4 Hybrid (42mi EV)", 42)
         self.vehicle_combo.addItem("Lexus NX350h (37mi EV)", 37)
         self.add_widget(self.vehicle_combo)
+
+        self._update_vehicle_label()
 
         self.add_widget(self._label("Distance (mi)"))
         self.distance_spin = QSpinBox()
@@ -64,6 +76,7 @@ class TripSetupForm(Card):
         self.add_widget(self._label("Passengers"))
         self.seat_selector = CarSeatSelector()
         self.add_widget(self.seat_selector)
+
         self.pax_label = QLabel("1 passenger")
         self.pax_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.pax_label.setStyleSheet(
@@ -100,10 +113,26 @@ class TripSetupForm(Card):
         self.add_stop_btn.clicked.connect(self._add_stop)
         self.remove_stop_btn.clicked.connect(self._remove_selected_stop)
 
+        self.vehicle_combo.currentIndexChanged.connect(
+            self._update_vehicle_label
+        )
+
     def _label(self, text: str) -> QLabel:
         lbl = QLabel(text)
         lbl.setStyleSheet(f"color: {Colors.TEXT_DISABLED.name()}; font-size: 12px;")
         return lbl
+
+    def _update_vehicle_label(self):
+        vehicle = self.vehicle_combo.currentText()
+
+        if "RAV4" in vehicle or "NX" in vehicle:
+            vehicle_type = "SUV"
+        else:
+            vehicle_type = "Sedan"
+
+        self.vehicle_label.setText(
+            f'Vehicle (<span style="color:{Colors.TEXT.name()}; font-weight:700;">{vehicle_type}</span>)'
+        )
 
     def _on_speed_changed(self, value: int):
         self.speed_value_label.setText(f"Avg speed: {value} mph")

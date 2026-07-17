@@ -13,9 +13,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(DashboardContainer())
 
     def keyPressEvent(self, event):
-        # Escape toggles fullscreen <-> normal window - handy while
-        # developing/testing so you're not stuck in fullscreen every run.
-        # Remove this if you want fullscreen to be locked for the demo.
         if event.key() == Qt.Key.Key_Escape:
             if self.isFullScreen():
                 self.showNormal()

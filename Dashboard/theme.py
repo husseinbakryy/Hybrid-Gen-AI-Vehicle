@@ -1,64 +1,62 @@
 """
-Defines the visual design system for the application.
-Widgets should import their colors, fonts, dimensions, and animation
-timings from here rather than hardcoding hex values or pixel sizes -
-that's what makes a full restyle later a one-file change instead of a
-hunt through every widget.
+Shared visual tokens for the dashboard UI.
+
+The palette is intentionally compact so widget styling stays consistent and
+future restyles only need to change this file.
 """
 
 from PyQt6.QtGui import QColor
 
 
 class Colors:
-    # Main backgrounds
-    BACKGROUND = QColor("#000000")       # pure black surround (fullscreen, step 2)
-    DASHBOARD = QColor("#0a0a0d")        # matches our existing app background
-    CARD = QColor("#131318")             # matches our existing card background
-    CARD_HOVER = QColor("#1c1c22")       # matches our existing input/track background
+    # Core surfaces
+    BACKGROUND = QColor("#070911")
+    DASHBOARD = QColor("#0c111b")
+    CARD = QColor("#141926")
+    CARD_HOVER = QColor("#1c2435")
+    BORDER = QColor("#2b3447")
+    BORDER_ACTIVE = QColor("#3b4a63")
 
-    # Borders
-    BORDER = QColor("#2a2a30")           # matches our existing card border
-    BORDER_ACTIVE = QColor("#3D4250")
+    # Typography
+    TEXT = QColor("#f5f7fb")
+    TEXT_SECONDARY = QColor("#9aa4b2")
+    TEXT_DISABLED = QColor("#6d7587")
 
-    # Text
-    TEXT = QColor("#e8e8ec")             # primary
-    TEXT_SECONDARY = QColor("#8a8a93")   # secondary
-    TEXT_DISABLED = QColor("#6a6a73")    # muted
+    # New dashboard accents
+    RANGE = QColor("#4da3ff")
+    COST = QColor("#f6c744")
+    TIME = QColor("#ff4d57")
+    CO2 = QColor("#35df78")
+    AI = QColor("#8a90a4")
 
-    # EV / Electric - single accent color, reused everywhere EV appears
-    EV = QColor("#00d9c0")
-    EV_DARK = QColor("#00B39E")
-    EV_GLOW = QColor("#5BFFE8")
-
-    # Gas - distinct warm color, never reused for anything else
-    GAS = QColor("#c0572e")
-    GAS_LIGHT = QColor("#FFB088")
-
-    # Status colors - kept separate from EV/GAS so the mode bar's fills
-    # never collide visually with alerts
-    GREEN = QColor("#39D98A")    # CO2 savings, positive deltas only
-    YELLOW = QColor("#FFC857")   # warnings
-    RED = QColor("#e2504a")      # critical battery/fuel, errors - matches our existing accent
+    # Action and state accents
+    ACCENT = RANGE
+    ACCENT_DARK = QColor("#2c7fe0")
+    ACCENT_GLOW = QColor("#8fd1ff")
+    SUCCESS = CO2
+    WARNING = COST
+    DANGER = TIME
 
     # Misc
     SHADOW = QColor(0, 0, 0, 180)
-    AMBIENT_GLOW = QColor(0, 217, 192, 30)  # matches EV accent
+    GRAPHITE = QColor("#1b2230")
+    TICK_MARK = QColor("#353b4b")
+    NEEDLE = QColor("#ff6b6b")
+    NEEDLE_RING = QColor("#ff7e5f")
+    SPEED_ZONE_ECO = CO2
+    SPEED_ZONE_MID = COST
+    SPEED_ZONE_HIGH = TIME
 
-    # Status badge backgrounds (the "Ready/Electric/Gas" pill) - dark
-    # tinted versions of EV/GAS so the badge text pops against them
-    EV_BADGE_BG = QColor("#0f3d38")
-    GAS_BADGE_BG = QColor("#3d1f0f")
-
-    # Dark graphite fill - reused for the car body and the speedometer hub
-    GRAPHITE = QColor("#242430")
-
-    # Speedometer-specific
-    TICK_MARK = QColor("#3a3a42")
-    NEEDLE = QColor("#ff433d")
-    NEEDLE_RING = QColor("#ff5c3d")
-    SPEED_ZONE_ECO = QColor("#0ed440")
-    SPEED_ZONE_MID = QColor("#f3931d")
-    SPEED_ZONE_HIGH = QColor("#cf0606")
+    # Backward-compatible aliases for existing widgets
+    EV = RANGE
+    EV_DARK = ACCENT_DARK
+    EV_GLOW = ACCENT_GLOW
+    GAS = QColor("#ff8c42")
+    GAS_LIGHT = QColor("#ffb477")
+    GREEN = CO2
+    YELLOW = COST
+    RED = TIME
+    AMBIENT_GLOW = QColor(77, 163, 255, 40)
 
 
 class Fonts:
@@ -107,7 +105,7 @@ class SpeedometerTheme:
     ARC_WIDTH = 12
     HUB_RADIUS = 8
     SPEED_TEXT_SIZE = 18
-    SPEED_TEXT_Y_OFFSET = 50
+    SPEED_TEXT_Y_OFFSET = 40
 
 
 class Animation:

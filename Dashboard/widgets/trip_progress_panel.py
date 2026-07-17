@@ -47,6 +47,7 @@ class TripProgressPanel(Card):
         self.start_btn = QPushButton("Start trip")
         self.start_btn.setObjectName("startBtn")
         self.reset_btn = QPushButton("Reset")
+        self.reset_btn.setObjectName("Secondary")
         btn_row.addWidget(self.start_btn)
         btn_row.addWidget(self.reset_btn)
         self.add_layout(btn_row)

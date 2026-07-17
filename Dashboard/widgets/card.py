@@ -45,11 +45,6 @@ class Card(QFrame):
         self.title.setObjectName("SectionTitle")
         self.title.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        # Title row is its own QHBoxLayout (not just a bare QLabel) so
-        # subclasses can optionally add something to the right of the
-        # title - e.g. TripProgressPanel's Ready/Electric/Gas badge -
-        # via add_header_widget(). Cards that don't call it look identical
-        # to before (title + stretch, nothing else).
         self.header_row = QHBoxLayout()
         self.header_row.addWidget(self.title)
         self.header_row.addStretch()

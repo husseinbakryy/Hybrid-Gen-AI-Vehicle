@@ -35,11 +35,11 @@ class Card(QFrame):
         root_layout.addWidget(self.accent)
 
         container = QWidget()
-        self.layout = QVBoxLayout(container)
-        self.layout.setContentsMargins(
+        self.content_layout = QVBoxLayout(container)
+        self.content_layout.setContentsMargins(
             Cards.PADDING, Cards.PADDING, Cards.PADDING, Cards.PADDING
         )
-        self.layout.setSpacing(Cards.CONTENT_SPACING)
+        self.content_layout.setSpacing(Cards.CONTENT_SPACING)
 
         self.title = QLabel(title.upper())
         self.title.setObjectName("SectionTitle")
@@ -53,7 +53,7 @@ class Card(QFrame):
         self.header_row = QHBoxLayout()
         self.header_row.addWidget(self.title)
         self.header_row.addStretch()
-        self.layout.addLayout(self.header_row)
+        self.content_layout.addLayout(self.header_row)
 
         root_layout.addWidget(container)
 
@@ -70,13 +70,13 @@ class Card(QFrame):
         )
 
     def add_widget(self, widget):
-        self.layout.addWidget(widget)
+        self.content_layout.addWidget(widget)
 
     def add_layout(self, layout):
-        self.layout.addLayout(layout)
+        self.content_layout.addLayout(layout)
 
     def add_spacing(self, value):
-        self.layout.addSpacing(value)
+        self.content_layout.addSpacing(value)
 
     def add_stretch(self):
-        self.layout.addStretch()
+        self.content_layout.addStretch()

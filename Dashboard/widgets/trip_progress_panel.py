@@ -94,11 +94,11 @@ class TripProgressPanel(Card):
 
     def set_mode(self, mode: str):
         if mode == "Electric":
-            bg, fg = "#0f3d38", Colors.EV.name()
+            bg, fg = Colors.EV_BADGE_BG.name(), Colors.EV.name()
         elif mode == "Gas":
-            bg, fg = "#3d1f0f", Colors.GAS.name()
+            bg, fg = Colors.GAS_BADGE_BG.name(), Colors.GAS.name()
         else:
-            bg, fg = "#0f3d38", Colors.EV.name()
+            bg, fg = Colors.EV_BADGE_BG.name(), Colors.EV.name()
         self.mode_badge.setText(mode)
         self.mode_badge.setStyleSheet(
             f"background-color: {bg}; color: {fg}; font-size: 11px; "

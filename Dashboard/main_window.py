@@ -78,7 +78,12 @@ class DashboardView(QWidget):
 
         # --- All the actual trip-planning math lives in trip_logic.py ---
         self._run_segments = trip_logic.compute_mode_segments(
-            self._run_dist, ev_range / load_factor, self._run_stops
+            self._run_dist,
+            ev_range / load_factor,
+            self._run_stops,
+            self.trip_form.get_temperature(),
+            self.trip_form.get_traffic(),
+            self.trip_form.get_style(),
         )
 
         self.progress_panel.set_plan(self._run_segments, self._run_stops, self._run_dist)
@@ -151,7 +156,13 @@ class DashboardView(QWidget):
     def _finish_trip(self):
         # --- Again, all the actual math lives in trip_logic.py ---
         stats = trip_logic.compute_trip_stats(
-            self._run_segments, self._run_stops, self._run_dist, self._run_speed
+            self._run_segments,
+            self._run_stops,
+            self._run_dist,
+            self._run_speed,
+            self.trip_form.get_temperature(),
+            self.trip_form.get_traffic(),
+            self.trip_form.get_style(),
         )
         self.stat_cards.set_stats(
             stats["cost"], f"{stats['hh']}h {stats['mm']}m", stats["co2"], stats["range_left"]

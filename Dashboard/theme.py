@@ -51,7 +51,9 @@ class Colors:
     EV = RANGE
     EV_DARK = ACCENT_DARK
     EV_GLOW = ACCENT_GLOW
+    EV_BADGE_BG = QColor("#0f3d38")
     GAS = QColor("#ff8c42")
+    GAS_BADGE_BG = QColor("#3d1f0f")
     GAS_LIGHT = QColor("#ffb477")
     GREEN = CO2
     YELLOW = COST

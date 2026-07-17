@@ -10,15 +10,6 @@ def get_dark_style() -> str:
 QMainWindow {{ background-color: {Colors.DASHBOARD.name()}; }}
 QLabel {{ color: {Colors.TEXT.name()}; }}
 
-QFrame#card {{
-    background-color: {Colors.CARD.name()};
-    border: 1px solid {Colors.BORDER.name()};
-    border-radius: 12px;
-}}
-QFrame#statTile {{
-    background-color: {Colors.CARD_HOVER.name()};
-    border-radius: 8px;
-}}
 QPushButton {{
     background-color: transparent;
     color: {Colors.TEXT_SECONDARY.name()};
@@ -74,10 +65,6 @@ QFrame#Dashboard {{
 QFrame#Card {{
     background-color: {Colors.CARD.name()};
     border: 1px solid {Colors.BORDER.name()};
-    border-radius: {Cards.RADIUS}px;
-}}
-QFrame#StatTile {{
-    background-color: {Colors.CARD.name()};
     border-radius: {Cards.RADIUS}px;
 }}
 QLabel#Title {{

@@ -17,7 +17,36 @@ GAS_COST_PER_MILE = 0.103    # NOTE: placeholder flat rate, not the trained mode
 CO2_PER_GAS_MILE = 0.04      # NOTE: placeholder, not sourced from real emissions data
 
 
-def compute_mode_segments(distance: float, ev_range: float, stops: list[int]) -> list[list]:
+def _placeholder_efficiency_modifier(temperature: int | None, traffic: str | None,
+                                      style: str | None) -> float:
+    """NOTE: placeholder rule-based efficiency modifier, not from real model."""
+    modifier = 1.0
+    if temperature is not None:
+        if temperature < 0:
+            modifier *= 0.94
+        elif temperature > 30:
+            modifier *= 0.97
+
+    if traffic is not None:
+        traffic_value = traffic.lower()
+        if traffic_value == "high":
+            modifier *= 0.93
+        elif traffic_value == "medium":
+            modifier *= 0.97
+
+    if style is not None:
+        style_value = style.lower()
+        if style_value == "aggressive":
+            modifier *= 0.95
+        elif style_value == "eco":
+            modifier *= 1.04
+
+    return max(modifier, 0.1)
+
+
+def compute_mode_segments(distance: float, ev_range: float, stops: list[int],
+                           temperature: int | None = None, traffic: str | None = None,
+                           style: str | None = None) -> list[list]:
     """Split a trip into alternating Electric/Gas segments given an EV range
     per full charge and a list of mile-marks where the battery is recharged
     to full (manual charging stops). Returns [[start_mi, end_mi, mode], ...].
@@ -26,12 +55,15 @@ def compute_mode_segments(distance: float, ev_range: float, stops: list[int]) ->
     gas, recharge at each stop"). Once the trained model is ready, this is
     likely what gets replaced or augmented with a real prediction.
     """
+    efficiency = _placeholder_efficiency_modifier(temperature, traffic, style)
+    effective_ev_range = ev_range * efficiency
+
     stops = sorted(s for s in stops if 0 < s < distance)
     boundaries = stops + [distance]
 
     segments = []
     pos = 0.0
-    battery_range = ev_range
+    battery_range = effective_ev_range
     for boundary in boundaries:
         span = boundary - pos
         if battery_range >= span:
@@ -44,7 +76,7 @@ def compute_mode_segments(distance: float, ev_range: float, stops: list[int]) ->
             segments.append([ev_end, boundary, "Gas"])
             battery_range = 0.0
         if boundary != distance:
-            battery_range = ev_range  # recharge to full at this stop
+            battery_range = effective_ev_range  # recharge to full at this stop
         pos = boundary
 
     merged = [segments[0]]
@@ -57,7 +89,8 @@ def compute_mode_segments(distance: float, ev_range: float, stops: list[int]) ->
 
 
 def compute_trip_stats(segments: list[list], stops: list[int], distance: float,
-                        speed: float) -> dict:
+                        speed: float, temperature: int | None = None,
+                        traffic: str | None = None, style: str | None = None) -> dict:
     """Cost, time, CO2, and range-left for a finished trip plan.
 
     NOTE: cost/CO2 use flat placeholder rates (EV_COST_PER_MILE,
@@ -67,13 +100,14 @@ def compute_trip_stats(segments: list[list], stops: list[int], distance: float,
     expects, so keep that the same if you want main_window.py to keep working
     unmodified.
     """
+    efficiency = _placeholder_efficiency_modifier(temperature, traffic, style)
     ev_miles = sum(e - s for s, e, m in segments if m == "Electric")
     gas_miles = sum(e - s for s, e, m in segments if m == "Gas")
 
-    cost = ev_miles * EV_COST_PER_MILE + gas_miles * GAS_COST_PER_MILE
+    cost = (ev_miles * EV_COST_PER_MILE + gas_miles * GAS_COST_PER_MILE) * efficiency
     drive_hrs = distance / speed
     charge_hrs = len(stops) * CHARGE_STOP_MINUTES / 60
-    total_hrs = drive_hrs + charge_hrs
+    total_hrs = (drive_hrs + charge_hrs) / efficiency
     hh, mm = int(total_hrs), round((total_hrs - int(total_hrs)) * 60)
     co2 = gas_miles * CO2_PER_GAS_MILE
     range_left = max(0, GAS_RANGE_ASSUMED - gas_miles)

@@ -179,5 +179,14 @@ class TripSetupForm(Card):
     def get_passengers(self) -> int:
         return self.seat_selector.passenger_count()
 
+    def get_temperature(self) -> int:
+        return self.temp_slider.value()
+
+    def get_traffic(self) -> str:
+        return self.traffic_combo.currentText()
+
+    def get_style(self) -> str:
+        return self.style_combo.currentText()
+
     def get_charging_stops(self) -> list[int]:
         return list(self.charging_stops)

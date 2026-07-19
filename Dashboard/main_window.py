@@ -12,11 +12,6 @@ import trip_logic
 
 
 class DashboardView(QWidget):
-    """All the actual dashboard content (speedometer, panels, form). Used
-    to be the QMainWindow's central widget directly - now it gets nested
-    inside DashboardContainer's floating panel instead. Nothing about its
-    internal behavior changed, just what it's a child of."""
-
     def __init__(self):
         super().__init__()
 
@@ -34,7 +29,6 @@ class DashboardView(QWidget):
         self.stat_cards = StatCardsPanel()
         self.recommendation = RecommendationPanel()
 
-        # Bottom group: everything except the speedometer, stacked together
         bottom_group = QVBoxLayout()
         bottom_group.addWidget(self.progress_panel)
         bottom_group.addWidget(self.stat_cards)
@@ -46,11 +40,8 @@ class DashboardView(QWidget):
         outer.addWidget(self.header, 0, 0, 1, 2)
         outer.addWidget(speedo_card, 1, 0)
         outer.addLayout(bottom_group, 2, 0)
-        # Trip Setup spans both rows on the right - a persistent sidebar
-        # while the speedometer + bottom group stack up on the left
         outer.addWidget(self.trip_form, 1, 1, 2, 1)
 
-        # Give the speedometer row more room than the bottom group row
         outer.setRowStretch(1, 1)
         outer.setRowStretch(2, 2)
 
@@ -76,9 +67,13 @@ class DashboardView(QWidget):
         load_factor = 1 + 0.02 * (pax - 1)
         self._run_stops = self.trip_form.get_charging_stops()
 
-        # --- All the actual trip-planning math lives in trip_logic.py ---
         self._run_segments = trip_logic.compute_mode_segments(
-            self._run_dist, ev_range / load_factor, self._run_stops
+            self._run_dist,
+            ev_range / load_factor,
+            self._run_stops,
+            self.trip_form.get_temperature(),
+            self.trip_form.get_traffic(),
+            self.trip_form.get_style(),
         )
 
         self.progress_panel.set_plan(self._run_segments, self._run_stops, self._run_dist)
@@ -149,9 +144,14 @@ class DashboardView(QWidget):
             self._finish_trip()
 
     def _finish_trip(self):
-        # --- Again, all the actual math lives in trip_logic.py ---
         stats = trip_logic.compute_trip_stats(
-            self._run_segments, self._run_stops, self._run_dist, self._run_speed
+            self._run_segments,
+            self._run_stops,
+            self._run_dist,
+            self._run_speed,
+            self.trip_form.get_temperature(),
+            self.trip_form.get_traffic(),
+            self.trip_form.get_style(),
         )
         self.stat_cards.set_stats(
             stats["cost"], f"{stats['hh']}h {stats['mm']}m", stats["co2"], stats["range_left"]

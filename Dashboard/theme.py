@@ -9,7 +9,6 @@ from PyQt6.QtGui import QColor
 
 
 class Colors:
-    # Core surfaces
     BACKGROUND = QColor("#070911")
     DASHBOARD = QColor("#0c111b")
     CARD = QColor("#141926")
@@ -17,19 +16,16 @@ class Colors:
     BORDER = QColor("#2b3447")
     BORDER_ACTIVE = QColor("#3b4a63")
 
-    # Typography
     TEXT = QColor("#f5f7fb")
     TEXT_SECONDARY = QColor("#9aa4b2")
     TEXT_DISABLED = QColor("#6d7587")
 
-    # New dashboard accents
     RANGE = QColor("#4da3ff")
     COST = QColor("#f6c744")
     TIME = QColor("#ff4d57")
     CO2 = QColor("#35df78")
     AI = QColor("#8a90a4")
 
-    # Action and state accents
     ACCENT = RANGE
     ACCENT_DARK = QColor("#2c7fe0")
     ACCENT_GLOW = QColor("#8fd1ff")
@@ -37,7 +33,6 @@ class Colors:
     WARNING = COST
     DANGER = TIME
 
-    # Misc
     SHADOW = QColor(0, 0, 0, 180)
     GRAPHITE = QColor("#1b2230")
     TICK_MARK = QColor("#353b4b")
@@ -47,11 +42,12 @@ class Colors:
     SPEED_ZONE_MID = COST
     SPEED_ZONE_HIGH = TIME
 
-    # Backward-compatible aliases for existing widgets
     EV = RANGE
     EV_DARK = ACCENT_DARK
     EV_GLOW = ACCENT_GLOW
+    EV_BADGE_BG = QColor("#0f3d38")
     GAS = QColor("#ff8c42")
+    GAS_BADGE_BG = QColor("#3d1f0f")
     GAS_LIGHT = QColor("#ffb477")
     GREEN = CO2
     YELLOW = COST

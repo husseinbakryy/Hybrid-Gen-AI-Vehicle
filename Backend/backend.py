@@ -4,10 +4,14 @@ from typing import Any
 import sys
 
 from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(BACKEND_DIR / ".env")
+
 MODELS_DIR = REPO_ROOT / "Models"
 if str(MODELS_DIR) not in sys.path:
 	sys.path.insert(0, str(MODELS_DIR))
@@ -41,6 +45,7 @@ app = FastAPI(
 	version="0.1.0",
 	description="Accepts dashboard trip inputs, runs ML models, and returns ML + GenAI recommendations.",
 )
+
 
 _ASSETS: tuple[Any, dict[str, Any]] | None = None
 

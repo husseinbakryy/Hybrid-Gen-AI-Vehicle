@@ -51,7 +51,7 @@ class StatCardsPanel(QWidget):
         self.cost_tile.set_value(f"${cost:.2f}")
         self.time_tile.set_value(time_str)
         self.co2_tile.set_value(f"{co2:.1f}kg")
-        self.range_tile.set_value(f"{round(range_left)} mi")
+        self.range_tile.set_value(f"{round(range_left)} km")
 
     def reset_stats(self):
         for tile in (self.cost_tile, self.time_tile, self.co2_tile, self.range_tile):

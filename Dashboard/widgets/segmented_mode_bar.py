@@ -6,6 +6,10 @@ from theme import Colors
 
 
 class SegmentedModeBar(QWidget):
+    """Trip-length bar showing every planned Electric/Gas segment as a
+    colored block, a dimmed overlay for distance not yet traveled, and a
+    tick mark for each manual charging stop. Colors from theme.Colors."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedHeight(16)

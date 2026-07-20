@@ -1,0 +1,7 @@
+[tool.pyright]
+extraPaths = [
+    "Models",
+    "Backend",
+    "Dashboard",
+    "Simulator"
+]

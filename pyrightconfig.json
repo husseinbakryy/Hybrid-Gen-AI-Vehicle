@@ -1,0 +1,9 @@
+{
+  "extraPaths": [
+    ".",
+    "Models",
+    "Backend",
+    "Dashboard",
+    "Simulator"
+  ]
+}

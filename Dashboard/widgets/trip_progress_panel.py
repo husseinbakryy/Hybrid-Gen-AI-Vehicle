@@ -26,9 +26,9 @@ class TripProgressPanel(Card):
         self.add_widget(self.mode_bar)
 
         labels_row = QHBoxLayout()
-        self.mile_label = QLabel("0 mi")
+        self.mile_label = QLabel("0 km")
         self.next_event_label = QLabel("no charging stops planned")
-        self.dist_label = QLabel("65 mi")
+        self.dist_label = QLabel("65 km")
         for lbl in (self.mile_label, self.next_event_label, self.dist_label):
             lbl.setStyleSheet(f"color: {Colors.TEXT_DISABLED.name()}; font-size: 12px;")
         labels_row.addWidget(self.mile_label)
@@ -122,5 +122,5 @@ class TripProgressPanel(Card):
         self.mode_bar.set_traveled(0)
         self.set_battery(100)
         self.set_fuel(100)
-        self.mile_label.setText("0 mi")
+        self.mile_label.setText("0 km")
         self.next_event_label.setText("no charging stops planned")

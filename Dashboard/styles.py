@@ -89,6 +89,10 @@ QLabel#LargeValue {{
     font-weight: 700;
     color: {Colors.TEXT.name()};
 }}
+QLabel#Muted {{
+    font-size: {Fonts.SMALL + 1}px;
+    color: {Colors.TEXT_DISABLED.name()};
+}}
 """
 
 DARK_STYLE = get_dark_style()

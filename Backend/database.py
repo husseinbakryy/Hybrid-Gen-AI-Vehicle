@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
+from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
 
+BACKEND_DIR = Path(__file__).resolve().parent
+load_dotenv(BACKEND_DIR / ".env")
+
 _CLIENT: MongoClient | None = None
-DEFAULT_MONGO_URI = "mongodb+srv://zayed:QZ9hebRwvjlE5Zdi@insights.g2d9utf.mongodb.net/"
 
 
 def get_mongo_client() -> MongoClient:
     global _CLIENT
     if _CLIENT is None:
-        mongo_uri = os.getenv("MONGODB_URI", DEFAULT_MONGO_URI)
+        mongo_uri = os.getenv("MONGODB_URI")
+        if not mongo_uri:
+            raise ValueError("MONGODB_URI environment variable is not set. Please set it in .env")
         _CLIENT = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
     return _CLIENT
 

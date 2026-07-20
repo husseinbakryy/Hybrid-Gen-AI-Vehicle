@@ -23,7 +23,7 @@ Open [http://localhost:8000](http://localhost:8000) or [http://127.0.0.1:8000](h
 ## Environment Variables (.env)
 
 ```env
-MONGODB_URI=mongodb+srv://zayed:QZ9hebRwvjlE5Zdi@insights.g2d9utf.mongodb.net/
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/
 MONGODB_DB_NAME=Vehicles
 MONGODB_COLLECTION_NAME=VehicleSpecs
 OPENROUTER_API_KEY=your_key_here

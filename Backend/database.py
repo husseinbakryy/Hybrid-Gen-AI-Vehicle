@@ -1,22 +1,36 @@
 from __future__ import annotations
 
+import importlib
 import os
 from pathlib import Path
 from typing import Any
+
 from dotenv import load_dotenv
-from pymongo import MongoClient
-from pymongo.errors import PyMongoError
+
+MongoClient: Any | None = None
+PyMongoError: type[Exception] = Exception
+
+try:
+    _mongo_mod = importlib.import_module("pymongo")
+    MongoClient = _mongo_mod.MongoClient
+    PyMongoError = _mongo_mod.errors.PyMongoError
+except ImportError:  # pragma: no cover - optional dependency for local API startup
+    MongoClient = None
+    PyMongoError = Exception
 
 
 BACKEND_DIR = Path(__file__).resolve().parent
 load_dotenv(BACKEND_DIR / ".env")
 
-_CLIENT: MongoClient | None = None
+_CLIENT: Any | None = None
 
 
-def get_mongo_client() -> MongoClient:
+def get_mongo_client() -> Any:
     global _CLIENT
     if _CLIENT is None:
+        if MongoClient is None:
+            raise RuntimeError("pymongo is not installed. Install Backend requirements to enable MongoDB-backed vehicle endpoints.")
+
         mongo_uri = os.getenv("MONGODB_URI")
         if not mongo_uri:
             raise ValueError("MONGODB_URI environment variable is not set. Please set it in .env")
@@ -24,7 +38,10 @@ def get_mongo_client() -> MongoClient:
     return _CLIENT
 
 
-def get_vehicles_collection():
+def get_vehicles_collection() -> Any | None:
+    if MongoClient is None:
+        return None
+
     client = get_mongo_client()
     db_name = os.getenv("MONGODB_DB_NAME", "Vehicles")
     col_name = os.getenv("MONGODB_COLLECTION_NAME", "VehicleSpecs")
@@ -103,6 +120,9 @@ def fetch_vehicles(
     unique_only: bool = True,
 ) -> list[dict[str, Any]]:
     col = get_vehicles_collection()
+    if col is None:
+        return []
+
     query: dict[str, Any] = {}
 
     if make:
@@ -143,6 +163,9 @@ def fetch_vehicles(
 
 def fetch_vehicle_by_id(vehicle_id: str) -> dict[str, Any] | None:
     col = get_vehicles_collection()
+    if col is None:
+        return None
+
     doc = col.find_one({"_id": vehicle_id})
     if not doc:
         return None

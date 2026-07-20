@@ -11,6 +11,18 @@ from theme import Colors
 
 
 class CarSeatSelector(QWidget):
+    """
+    Passenger selector.
+
+    The first circle represents the driver and is always selected.
+    Clicking a circle selects all circles up to that point.
+
+    Examples:
+        ● ○ ○ ○ ○ = 1 occupant
+        ● ● ○ ○ ○ = 2 occupants
+        ● ● ● ○ ○ = 3 occupants
+    """
+
     passengersChanged = pyqtSignal(int)
 
     def __init__(self, parent=None):
@@ -55,6 +67,7 @@ class CarSeatSelector(QWidget):
     def _clicked(self, index):
         new_count = index + 1
 
+        # Clicking the highest selected circle removes one passenger.
         if new_count == self._count and self._count > 1:
             self._count -= 1
         else:

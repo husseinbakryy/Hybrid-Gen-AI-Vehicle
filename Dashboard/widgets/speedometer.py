@@ -27,8 +27,8 @@ class Speedometer(QWidget):
         super().__init__(parent)
         self.setMinimumSize(260, 260)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._speed = 0.0
-        self._display_speed = 0.0
+        self._speed = 0.0           # last commanded target
+        self._display_speed = 0.0   # animated value actually drawn
         self._sweep_anim = None
 
     def setSpeed(self, value: float):
@@ -57,6 +57,9 @@ class Speedometer(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        # QRectF (not QRect) so .center() returns a float-based QPointF -
+        # QRect's .center() returns an int QPoint, which doesn't match
+        # drawEllipse's QPointF+float+float overload used below.
         rect = QRectF(self.rect()).adjusted(20, 20, -20, -20)
         center = rect.center()
         radius = min(rect.width(), rect.height()) / 2
@@ -83,6 +86,9 @@ class Speedometer(QWidget):
         )
         start_deg = 225
         span_deg = 270 * (self._display_speed / SpeedometerTheme.MAX_SPEED)
+        # start_deg is NOT negated - it needs to land at the same 225deg
+        # position (bottom-left) as the "0" tick mark. Only span_deg is
+        # negative, since the fill sweeps clockwise as speed increases.
         painter.drawArc(arc_rect, int(start_deg * 16), int(-span_deg * 16))
 
     def _draw_ticks(self, painter, center, radius):

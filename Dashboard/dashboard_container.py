@@ -28,6 +28,9 @@ class DashboardContainer(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # QFrame (not QWidget) so the QFrame#Dashboard stylesheet rule
+        # from styles.py applies (background, border, radius) - plain QSS
+        # only, no QGraphicsEffect.
         self.panel = QFrame()
         self.panel.setObjectName("Dashboard")
 

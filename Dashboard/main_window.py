@@ -56,7 +56,7 @@ class DashboardView(QWidget):
 
         self.trip_form.speedChanged.connect(self.speedometer.setSpeed)
         self.trip_form.distanceChanged.connect(
-            lambda v: self.progress_panel.dist_label.setText(f"{v} mi")
+            lambda v: self.progress_panel.dist_label.setText(f"{v} km")
         )
         self.speedometer.setSpeed(self.trip_form.get_speed())
 
@@ -74,7 +74,25 @@ class DashboardView(QWidget):
         ev_range = self.trip_form.get_ev_range()
         pax = self.trip_form.get_passengers()
         load_factor = 1 + 0.02 * (pax - 1)
-        self._run_stops = self.trip_form.get_charging_stops()
+        self._run_stops = []
+
+        payload_json = trip_logic.build_trip_payload_json(
+            vehicle=self.trip_form.get_selected_vehicle(),
+            weather=self.trip_form.get_weather(),
+            temp=self.trip_form.get_temperature(),
+            humidity=self.trip_form.get_humidity(),
+            wind=self.trip_form.get_wind_speed(),
+            trip_purpose=self.trip_form.get_trip_purpose(),
+            road_type=self.trip_form.get_road_type(),
+            traffic=self.trip_form.get_traffic(),
+            distance=self.trip_form.get_distance(),
+            passengers=self.trip_form.get_passengers(),
+            cargo=self.trip_form.get_cargo_kg(),
+            style=self.trip_form.get_style(),
+        )
+        print("\n========== TRIP PAYLOAD ==========")
+        print(payload_json)
+        print("===================================\n")
 
         # --- All the actual trip-planning math lives in trip_logic.py ---
         self._run_segments = trip_logic.compute_mode_segments(
@@ -119,9 +137,9 @@ class DashboardView(QWidget):
         if next_stop is None and next_switch is None:
             return "no more events"
         if next_stop is not None and (next_switch is None or next_stop <= next_switch):
-            return f"charging stop at {round(next_stop)} mi"
+            return f"charging stop at {round(next_stop)} km"
         other_mode = "Gas" if mode == "Electric" else "Electric"
-        return f"switch to {other_mode} at {round(next_switch)} mi"
+        return f"switch to {other_mode} at {round(next_switch)} km"
 
     def _tick_trip(self):
         self._trip_progress += 2.0
@@ -130,21 +148,21 @@ class DashboardView(QWidget):
             self._trip_progress = 100
             self.trip_timer.stop()
 
-        miles = (self._trip_progress / 100) * self._run_dist
-        self.progress_panel.mile_label.setText(f"{round(miles)} mi")
-        self.progress_panel.mode_bar.set_traveled(miles)
-        self.progress_panel.next_event_label.setText(self._next_event_text(miles))
+        kilometers = (self._trip_progress / 100) * self._run_dist
+        self.progress_panel.mile_label.setText(f"{round(kilometers)} km")
+        self.progress_panel.mode_bar.set_traveled(kilometers)
+        self.progress_panel.next_event_label.setText(self._next_event_text(kilometers))
 
-        seg_start, seg_end, mode = self._segment_at(miles)
+        seg_start, seg_end, mode = self._segment_at(kilometers)
         self.progress_panel.set_mode(mode)
         if mode == "Electric":
             seg_len = max(0.01, seg_end - seg_start)
-            batt = max(0, 100 - ((miles - seg_start) / seg_len) * 100)
+            batt = max(0, 100 - ((kilometers - seg_start) / seg_len) * 100)
             self.progress_panel.set_battery(batt)
         else:
             self.progress_panel.set_battery(0)
             total_gas = sum(e - s for s, e, m in self._run_segments if m == "Gas")
-            gas_so_far = self._cumulative_gas_before(miles)
+            gas_so_far = self._cumulative_gas_before(kilometers)
             fuel_pct = 100 - (gas_so_far / total_gas) * 40 if total_gas > 0 else 100
             self.progress_panel.set_fuel(max(0, fuel_pct))
 

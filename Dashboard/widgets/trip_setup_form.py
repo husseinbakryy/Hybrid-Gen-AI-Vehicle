@@ -53,8 +53,13 @@ class TripSetupForm(Card):
 
         self.form_widget = QWidget()
         self.form_layout = QVBoxLayout(self.form_widget)
-        self.form_layout.setContentsMargins(0, 0, 12, 0)
+        # Reserve right-side space for the scrollbar so controls don't sit under it.
+        # Viewport margins ensure the scrollbar occupies its own column rather than
+        # floating over the content (some platforms/styles overlay scrollbars).
+        self.form_layout.setContentsMargins(0, 0, 0, 0)
         self.form_layout.setSpacing(8)
+        # Reserve explicit space in the viewport for the scrollbar track.
+        self.scroll_area.setViewportMargins(0, 0, 12, 0)
         self.scroll_area.setWidget(self.form_widget)
 
         super().add_widget(self.scroll_area)
@@ -71,12 +76,8 @@ class TripSetupForm(Card):
         self.add_widget(self.vehicle_label)
 
         self.vehicle_combo = QComboBox()
-        self.vehicle_combo.addItem("Nexa VoltMini", 72)
-        self.vehicle_combo.addItem("Aster Luma 5", 68)
-        self.vehicle_combo.addItem("Orion Pulse H", 80)
-        self.vehicle_combo.addItem("Terra Trail H", 75)
-        self.vehicle_combo.addItem("Helio Cruze L", 70)
-        self.vehicle_combo.addItem("Helio Rover X", 65)
+        # Initially disabled until the app fetches the live catalog at startup.
+        self.vehicle_combo.setEnabled(False)
         self.add_widget(self.vehicle_combo)
 
         self._update_vehicle_label()
@@ -226,7 +227,22 @@ class TripSetupForm(Card):
         self.pax_label.setText(f"{count} passenger" + ("" if count == 1 else "s"))
 
     def get_ev_range(self) -> int:
-        return self.vehicle_combo.currentData()
+        # Use the nominal per-vehicle EV ranges defined centrally in trip_logic
+        # so the UI's time/range math has consistent inputs even when the
+        # backend catalog doesn't include an ev_range field.
+        try:
+            import trip_logic
+            sel = self.get_selected_vehicle()
+            if not sel:
+                return 0
+            val = trip_logic.NOMINAL_EV_RANGE_KM.get(sel)
+            if val is None:
+                print(f"[trip_setup_form] Warning: no nominal EV range for '{sel}', defaulting to 0 km")
+                return 0
+            return val
+        except Exception:
+            # Defensive: never return None to caller
+            return 0
 
     def get_selected_vehicle(self) -> str:
         return self.vehicle_combo.currentText()

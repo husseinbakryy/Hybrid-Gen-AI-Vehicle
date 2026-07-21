@@ -13,6 +13,14 @@ Current state: rule-based placeholders (see NOTE comments). Not the real model.
 import json
 from datetime import datetime
 
+# requests is used to fetch the live vehicle catalog from the teammate backend.
+# Keep this dependency minimal (requests) so the rest of the file remains
+# plain Python. On failure, the code falls back to the bundled VEHICLE_CATALOG.
+try:
+    import requests
+except Exception:  # pragma: no cover - environment may not have requests installed
+    requests = None
+
 GAS_RANGE_ASSUMED = 480      # miles - placeholder assumption, not from real data
 CHARGE_STOP_MINUTES = 15     # placeholder assumption for a charging stop's duration
 EV_COST_PER_MILE = 0.073     # NOTE: placeholder flat rate, not the trained model
@@ -23,15 +31,91 @@ CO2_PER_GAS_MILE = 0.04      # NOTE: placeholder, not sourced from real emission
 CITY = "Chicago"
 SEASON = "fall"
 
-# PLACEHOLDER - replace with teammate's real vehicle list.
-VEHICLE_CATALOG = {
-    "Nexa VoltMini": {"make": "Nexa", "model": "VoltMini"},
-    "Aster Luma 5": {"make": "Aster", "model": "Luma 5"},
-    "Orion Pulse H": {"make": "Orion", "model": "Pulse H"},
-    "Terra Trail H": {"make": "Terra", "model": "Trail H"},
-    "Helio Cruze L": {"make": "Helio", "model": "Cruze L"},
-    "Helio Rover X": {"make": "Helio", "model": "Rover X"},
+# At startup this is intentionally empty; the app fetches the live
+# vehicle catalog from the backend. If the backend is unavailable at
+# startup the catalog will remain empty and the UI will show a clear
+# inline message. Do NOT hardcode a fallback list here.
+VEHICLE_CATALOG: dict = {}
+
+# Nominal per-vehicle EV ranges (km) derived from Data/synthetic_trips.csv.
+# Kept local so the UI's placeholder time/range math has consistent inputs
+# even when the backend's catalog doesn't include an ev_range field.
+# Values (do not change without re-running aggregation on the dataset):
+NOMINAL_EV_RANGE_KM = {
+    "Aster Luma 5": 441,
+    "Nexa VoltMini": 331,
+    "Orion Pulse H": 63,
+    "Terra Trail H": 61,
+    "Helio Rover X": 13,
+    "Helio Cruze L": 4,
 }
+
+
+def fetch_vehicle_catalog(base_url: str = "http://localhost:8000", timeout: float = 2.0) -> dict:
+    """Fetch vehicle catalog from teammate backend and normalize to the
+    local VEHICLE_CATALOG shape: display_name -> {make, model, body_type,
+    powertrain_type_display}.
+
+    On any failure (requests not installed, connection error, timeout, bad
+    JSON, non-200 status), print a one-line warning and return the bundled
+    VEHICLE_CATALOG as a graceful fallback.
+    """
+    # If requests is unavailable for any reason, fall back immediately.
+    if requests is None:
+        print(f"[trip_logic] requests library not available, vehicle catalog unavailable")
+        return {}
+
+    url = f"{base_url.rstrip('/')}/api/vehicles?unique=true"
+    try:
+        resp = requests.get(url, timeout=timeout)
+        if resp.status_code != 200:
+            print(f"[trip_logic] Could not reach backend at {base_url}, vehicle catalog unavailable")
+            return {}
+
+        data = resp.json()
+        vehicles = data.get("vehicles")
+        if not isinstance(vehicles, list):
+            print(f"[trip_logic] Unexpected vehicle response shape, vehicle catalog unavailable")
+            return {}
+
+        out = {}
+        for v in vehicles:
+            vehicle_name = v.get("vehicle_name")
+            name = v.get("name")
+            body_type = v.get("body_type")
+            power_train_type = v.get("power_train_type")
+
+            if not vehicle_name or not name:
+                # Skip malformed entries but continue processing others
+                continue
+
+            make = name
+            model = vehicle_name
+            prefix = f"{name} "
+            if vehicle_name.startswith(prefix):
+                model = vehicle_name[len(prefix):]
+            else:
+                # Degrade gracefully if naming doesn't match - log a warning.
+                print(f"[trip_logic] Warning: vehicle_name '{vehicle_name}' does not start with name '{name}', using full vehicle_name as model")
+
+            display = vehicle_name
+            out[display] = {
+                "make": make,
+                "model": model,
+                "body_type": body_type,
+                "powertrain_type_display": power_train_type,
+            }
+
+        if not out:
+            # Nothing parsed - return empty
+            print(f"[trip_logic] No valid vehicles in backend response, vehicle catalog unavailable")
+            return {}
+
+        return out
+
+    except Exception:
+        print(f"[trip_logic] Could not reach backend at {base_url}, vehicle catalog unavailable")
+        return {}
 
 
 def _placeholder_efficiency_modifier(temperature: int | None, traffic: str | None,

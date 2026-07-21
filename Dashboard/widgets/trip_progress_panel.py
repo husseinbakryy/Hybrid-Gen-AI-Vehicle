@@ -27,7 +27,9 @@ class TripProgressPanel(Card):
 
         labels_row = QHBoxLayout()
         self.mile_label = QLabel("0 km")
-        self.next_event_label = QLabel("no charging stops planned")
+        # Removed leftover text from manual charging-stops feature; keep label empty
+        # unless a real event needs to be shown.
+        self.next_event_label = QLabel("")
         self.dist_label = QLabel("65 km")
         for lbl in (self.mile_label, self.next_event_label, self.dist_label):
             lbl.setStyleSheet(f"color: {Colors.TEXT_DISABLED.name()}; font-size: 12px;")
@@ -46,8 +48,12 @@ class TripProgressPanel(Card):
         btn_row = QHBoxLayout()
         self.start_btn = QPushButton("Start trip")
         self.start_btn.setObjectName("startBtn")
+        # Ensure buttons cannot be squished to near-zero height by setting
+        # a comfortable minimum. This is a permanent layout safeguard.
+        self.start_btn.setMinimumHeight(38)
         self.reset_btn = QPushButton("Reset")
         self.reset_btn.setObjectName("Secondary")
+        self.reset_btn.setMinimumHeight(38)
         btn_row.addWidget(self.start_btn)
         btn_row.addWidget(self.reset_btn)
         self.add_layout(btn_row)

@@ -29,6 +29,13 @@ class SegmentedModeBar(QWidget):
         self._traveled = miles
         self.update()
 
+    def set_recommended_mode(self, mode: str | None):
+        """Set the recommended mode (e.g. 'ev', 'hybrid', 'ice') which will
+        cause the widget to render a single colored badge. Pass None to
+        restore the segmented rendering behaviour."""
+        self._recommended_mode = mode
+        self.update()
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -37,6 +44,30 @@ class SegmentedModeBar(QWidget):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(Colors.CARD_HOVER)
         painter.drawRoundedRect(0, 0, w, h, h / 2, h / 2)
+
+        # If a recommended mode was set by the backend, render a single
+        # filled badge instead of the segmented bar.
+        if getattr(self, '_recommended_mode', None) is not None:
+            mode = self._recommended_mode
+            if mode == "ev":
+                bg = Colors.EV_BADGE_BG
+                fg = Colors.EV
+                text = "Electric"
+            elif mode == "hybrid":
+                bg = Colors.GAS_BADGE_BG
+                fg = Colors.GAS
+                text = "Hybrid"
+            else:
+                bg = Colors.GAS_BADGE_BG
+                fg = Colors.GAS
+                text = "Gas"
+
+            painter.setBrush(bg)
+            rect = QRectF(0, 0, w, h)
+            painter.drawRoundedRect(rect, h / 2, h / 2)
+            painter.setPen(fg)
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
+            return
 
         for start, end, mode in self._segments:
             x1 = (start / self._distance) * w

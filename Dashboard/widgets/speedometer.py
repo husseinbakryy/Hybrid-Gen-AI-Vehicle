@@ -133,4 +133,4 @@ class Speedometer(QWidget):
         painter.setFont(QFont(Fonts.FAMILY, Fonts.SMALL + 1))
         mph_y = int(center.y()) + 40 + SpeedometerTheme.SPEED_TEXT_Y_OFFSET
         painter.drawText(0, mph_y, self.width(), 30,
-                          Qt.AlignmentFlag.AlignHCenter, "MPH")
+                          Qt.AlignmentFlag.AlignHCenter, "km/h")

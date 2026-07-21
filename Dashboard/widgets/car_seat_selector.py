@@ -18,9 +18,9 @@ class CarSeatSelector(QWidget):
     Clicking a circle selects all circles up to that point.
 
     Examples:
-        ● ○ ○ ○ ○ ○ = 1 occupant
-        ● ● ○ ○ ○ ○ = 2 occupants
-        ● ● ● ○ ○ ○ = 3 occupants
+        ● ○ ○ ○ ○ = 1 occupant
+        ● ● ○ ○ ○ = 2 occupants
+        ● ● ● ○ ○ = 3 occupants
     """
 
     passengersChanged = pyqtSignal(int)
@@ -44,7 +44,7 @@ class CarSeatSelector(QWidget):
         row.setSpacing(12)
         row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        for i in range(6):
+        for i in range(5):
             btn = QPushButton()
             btn.setFixedSize(28, 28)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -60,7 +60,7 @@ class CarSeatSelector(QWidget):
         return self._count
 
     def set_passenger_count(self, count):
-        count = max(1, min(6, count))
+        count = max(1, min(5, count))
         self._count = count
         self._refresh()
 

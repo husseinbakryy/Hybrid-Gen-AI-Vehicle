@@ -279,12 +279,12 @@ class DashboardView(QWidget):
 
         # Try multiple locations for ML output (some backends may differ)
         ml_raw = None
-        if 'ml_output' in resp and isinstance(resp['ml_output'], dict):
-            ml = resp['ml_output']
+        if 'pipeline_predictions' in resp and isinstance(resp['pipeline_predictions'], dict):
+            ml = resp['pipeline_predictions']
             if isinstance(ml.get('raw'), dict):
                 ml_raw = ml['raw']
             else:
-                # Some backends use ml_output.raw vs ml_results; try top-level
+                # Some backends use pipeline_predictions.raw vs ml_results; try top-level
                 ml_raw = ml
         elif 'ml_results' in resp and isinstance(resp['ml_results'], dict):
             ml_raw = resp['ml_results']
@@ -293,7 +293,7 @@ class DashboardView(QWidget):
         else:
             ml_raw = {}
 
-        genai = resp.get('genai_recommendation') or resp.get('genai') or resp.get('ai_advice') or {}
+        genai = resp.get('agent_recommendation') or resp.get('genai') or resp.get('ai_advice') or {}
 
         # Extract numeric fields with safe defaults
         recommended_mode = None
@@ -303,12 +303,16 @@ class DashboardView(QWidget):
             battery_used = ml_raw.get('battery_used_kwh', 0.0)
             co2 = ml_raw.get('co2_emissions_kg', ml_raw.get('co2', 0.0))
             cost = ml_raw.get('trip_cost_usd', ml_raw.get('cost', 0.0))
+            range_left_km = ml_raw.get('range_left_km', 0.0)
+            trip_time_min = ml_raw.get('trip_time_min', 0.0)
         else:
             recommended_mode = None
             fuel_used = 0.0
             battery_used = 0.0
             co2 = 0.0
             cost = 0.0
+            range_left_km = 0.0
+            trip_time_min = 0.0
 
         def _to_float(x):
             try:
@@ -316,7 +320,11 @@ class DashboardView(QWidget):
             except Exception:
                 return 0.0
 
-        # Compute local Time and Range Left using the same local math as before
+        # Still compute local segments/stats - the Time and Range Left tiles
+        # no longer use this (they're wired straight to the backend's
+        # trip_time_min/range_left_km below), but the describe_segments()
+        # fallback further down still depends on it when agent_recommendation
+        # has no summary.
         stats = trip_logic.compute_trip_stats(
             self._run_segments,
             self._run_stops,
@@ -326,22 +334,24 @@ class DashboardView(QWidget):
             self.trip_form.get_traffic(),
             self.trip_form.get_style(),
         )
-        time_str = f"{stats['hh']}h {stats['mm']}m"
-        range_left = stats['range_left']
 
-        # Update stat tiles: use ml values for cost/co2/fuel/battery, local for time/range
+        hh, mm = trip_logic.minutes_to_hh_mm(_to_float(trip_time_min))
+        time_str = f"{hh}h {mm}m"
+        range_left = _to_float(range_left_km)
+
+        # Update stat tiles: all six values now come from pipeline_predictions.raw
         try:
             self.stat_cards.set_extended_stats(
                 _to_float(cost),
                 time_str,
                 _to_float(co2),
-                _to_float(range_left),
+                range_left,
                 _to_float(fuel_used),
                 _to_float(battery_used),
             )
         except Exception:
             # Fallback: set what we can
-            self.stat_cards.set_stats(_to_float(cost), time_str, _to_float(co2), _to_float(range_left))
+            self.stat_cards.set_stats(_to_float(cost), time_str, _to_float(co2), range_left)
 
         # Update mode badge/bar to show single recommended mode
         if recommended_mode:

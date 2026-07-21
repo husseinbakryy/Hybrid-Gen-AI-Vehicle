@@ -225,6 +225,16 @@ def compute_trip_stats(segments: list[list], stops: list[int], distance: float,
     }
 
 
+def minutes_to_hh_mm(total_minutes: float) -> tuple[int, int]:
+    """Convert a total-minutes float (e.g. trip_time_min from the backend)
+    into (hours, minutes), same rounding approach as compute_trip_stats'
+    hh/mm derivation from total_hrs."""
+    total_hrs = total_minutes / 60
+    hh = int(total_hrs)
+    mm = round((total_hrs - hh) * 60)
+    return hh, mm
+
+
 def describe_segments(segments: list[list], stops: list[int], cost: float,
                        hh: int, mm: int) -> str:
     """Plain-English trip summary.

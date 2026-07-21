@@ -4,7 +4,19 @@ from typing import Any
 import joblib
 import pandas as pd
 
-from .config import ARTIFACT_DIR, FEATURES, MODEL_ASSETS, PREPROCESSOR_FILE
+from .config import (
+    ARTIFACT_DIR,
+    AVG_FUEL_ECONOMY_KM_PER_L,
+    CO2_PER_KWH_GRID,
+    CO2_PER_LITER_FUEL,
+    ELEC_PRICE_PER_KWH,
+    EV_CONSUMPTION_KWH_PER_KM,
+    FEATURES,
+    FUEL_PRICE_PER_LITER,
+    MAX_SPEED_KMH,
+    MODEL_ASSETS,
+    PREPROCESSOR_FILE,
+)
 
 
 
@@ -31,6 +43,111 @@ def load_assets(artifact_dir: str | Path = ARTIFACT_DIR):
 
     return preprocessor, models
 
+
+# ---------------------------------------------------------------------------
+# Post-prediction consistency layer
+# ---------------------------------------------------------------------------
+
+def _enforce_consistency(
+    raw: dict[str, Any],
+    inputs: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply domain / physics rules so the 7 independently-predicted targets
+    are mutually consistent.  Operates on the *raw* prediction dict returned
+    by the models and returns a corrected copy.
+
+    Rules applied (in order):
+      1. Non-negativity
+      2. Powertrain-energy exclusion
+      3. Mode-energy alignment
+      4. Capacity capping
+      5. CO₂ re-derivation from energy
+      6. Cost re-derivation from energy
+      7. Physics-based remaining range
+      8. Trip-time floor
+    """
+    out = dict(raw)  # shallow copy
+
+    # --- Extract vehicle / trip attributes from the input features ----------
+    powertrain = str(inputs.get("powertrain_type", "")).lower()
+    usable_bat = float(inputs.get("usable_battery_kwh", 0.0))
+    fuel_tank = float(inputs.get("fuel_tank_l", 0.0))
+    distance_km = float(inputs.get("distance_km", 0.0))
+
+    # Derive nominal EV range from battery capacity & consumption rate
+    nominal_ev_range = usable_bat / EV_CONSUMPTION_KWH_PER_KM if usable_bat > 0 else 0.0
+
+    # --- 1. Non-negativity --------------------------------------------------
+    for key in ("fuel_used_l", "battery_used_kwh", "co2_emissions_kg",
+                "trip_cost_usd", "range_left_km", "trip_time_min"):
+        out[key] = max(0.0, float(out.get(key, 0.0)))
+
+    # --- 2. Powertrain-energy exclusion -------------------------------------
+    if powertrain == "ev":
+        out["fuel_used_l"] = 0.0
+    elif powertrain == "ice":
+        out["battery_used_kwh"] = 0.0
+
+    # --- 3. Mode-energy alignment -------------------------------------------
+    mode = str(out.get("recommended_mode", "")).lower()
+
+    # Override impossible mode for the powertrain first
+    if powertrain == "ev" and mode == "ice":
+        out["recommended_mode"] = "ev"
+        mode = "ev"
+    elif powertrain == "ice" and mode == "ev":
+        out["recommended_mode"] = "ice"
+        mode = "ice"
+
+    # For hybrids: if distance > EV range and mode is EV, switch to hybrid
+    if powertrain == "hybrid" and mode == "ev" and distance_km > nominal_ev_range > 0:
+        out["recommended_mode"] = "hybrid"
+        mode = "hybrid"
+
+    # Enforce energy zeros consistent with (corrected) mode
+    if mode == "ev":
+        out["fuel_used_l"] = 0.0
+    elif mode == "ice":
+        out["battery_used_kwh"] = 0.0
+
+    # --- 4. Capacity capping ------------------------------------------------
+    if usable_bat > 0:
+        out["battery_used_kwh"] = min(out["battery_used_kwh"], usable_bat)
+    if fuel_tank > 0:
+        out["fuel_used_l"] = min(out["fuel_used_l"], fuel_tank)
+
+    # --- 5. CO₂ re-derivation -----------------------------------------------
+    out["co2_emissions_kg"] = round(
+        out["fuel_used_l"] * CO2_PER_LITER_FUEL
+        + out["battery_used_kwh"] * CO2_PER_KWH_GRID,
+        4,
+    )
+
+    # --- 6. Cost re-derivation ----------------------------------------------
+    out["trip_cost_usd"] = round(
+        out["fuel_used_l"] * FUEL_PRICE_PER_LITER
+        + out["battery_used_kwh"] * ELEC_PRICE_PER_KWH,
+        4,
+    )
+
+    # --- 7. Physics-based remaining range -----------------------------------
+    ev_range_left = 0.0
+    if usable_bat > 0:
+        bat_remaining = max(0.0, usable_bat - out["battery_used_kwh"])
+        ev_range_left = (bat_remaining / usable_bat) * nominal_ev_range
+
+    fuel_range_left = 0.0
+    if fuel_tank > 0:
+        fuel_remaining = max(0.0, fuel_tank - out["fuel_used_l"])
+        fuel_range_left = fuel_remaining * AVG_FUEL_ECONOMY_KM_PER_L
+
+    out["range_left_km"] = round(ev_range_left + fuel_range_left, 2)
+
+    # --- 8. Trip-time floor -------------------------------------------------
+    min_time = (distance_km / MAX_SPEED_KMH) * 60.0 if distance_km > 0 else 1.0
+    out["trip_time_min"] = max(out["trip_time_min"], min_time, 1.0)
+
+    return out
 
 
 def predict_trip_structured(
@@ -66,6 +183,9 @@ def predict_trip_structured(
         "range_left_km": pred_range_left,
         "trip_time_min": pred_trip_time,
     }
+
+    # ---- Apply cross-target consistency rules ------------------------------
+    raw = _enforce_consistency(raw, input_data_dict)
 
     formatted = {
         "Recommended Driving Mode": raw["recommended_mode"],

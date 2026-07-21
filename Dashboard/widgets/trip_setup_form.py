@@ -207,10 +207,13 @@ class TripSetupForm(Card):
     def _update_vehicle_label(self):
         vehicle = self.vehicle_combo.currentText()
 
-        if "RAV4" in vehicle or "NX" in vehicle:
-            vehicle_type = "SUV"
+        import trip_logic
+        entry = trip_logic.VEHICLE_CATALOG.get(vehicle)
+        body_type = entry.get("body_type") if entry else None
+        if body_type:
+            vehicle_type = "SUV" if body_type.lower() == "suv" else body_type.capitalize()
         else:
-            vehicle_type = "Sedan"
+            vehicle_type = "Vehicle"
 
         self.vehicle_label.setText(
             f'Vehicle (<span style="color:{Colors.TEXT.name()}; font-weight:700;">{vehicle_type}</span>)'

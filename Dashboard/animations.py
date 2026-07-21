@@ -9,14 +9,15 @@ from PyQt6.QtWidgets import QLabel
 from theme import Animation
 
 
-def animate_counter(label: QLabel, start, end, prefix="", suffix="", decimals=0):
+def animate_counter(label: QLabel, start, end, prefix="", suffix="", decimals=0,
+                     duration=Animation.COUNTER):
     """Counts a QLabel's text up/down from start to end - used for the
     stat cards (Cost, Time, CO2, Range) so the numbers animate in
     instead of just snapping to the final value."""
     animation = QVariantAnimation(label)
     animation.setStartValue(start)
     animation.setEndValue(end)
-    animation.setDuration(Animation.COUNTER)
+    animation.setDuration(duration)
     animation.setEasingCurve(QEasingCurve.Type.OutCubic)
 
     def update(value):

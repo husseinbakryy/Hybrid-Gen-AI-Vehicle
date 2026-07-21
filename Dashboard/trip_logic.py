@@ -51,10 +51,14 @@ NOMINAL_EV_RANGE_KM = {
 }
 
 
-def fetch_vehicle_catalog(base_url: str = "http://localhost:8000", timeout: float = 2.0) -> dict:
+def fetch_vehicle_catalog(base_url: str = "http://localhost:8000", timeout: float = 2.0,
+                           powertrain_type: str | None = "hybrid") -> dict:
     """Fetch vehicle catalog from teammate backend and normalize to the
     local VEHICLE_CATALOG shape: display_name -> {make, model, body_type,
     powertrain_type_display}.
+
+    powertrain_type filters the backend query (default "hybrid" - pass
+    None to fetch every powertrain type unfiltered).
 
     On any failure (requests not installed, connection error, timeout, bad
     JSON, non-200 status), print a one-line warning and return the bundled
@@ -65,7 +69,9 @@ def fetch_vehicle_catalog(base_url: str = "http://localhost:8000", timeout: floa
         print(f"[trip_logic] requests library not available, vehicle catalog unavailable")
         return {}
 
-    url = f"{base_url.rstrip('/')}/api/vehicles?unique=true"
+    url = f"{base_url.rstrip('/')}/api/vehicles?unique=true" + (
+        f"&powertrain_type={powertrain_type}" if powertrain_type else ""
+    )
     try:
         resp = requests.get(url, timeout=timeout)
         if resp.status_code != 200:

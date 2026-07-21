@@ -28,6 +28,7 @@ class Colors:
     TIME = QColor("#ff4d57")
     CO2 = QColor("#35df78")
     AI = QColor("#8a90a4")
+    RANGE_LEFT = QColor("#a78bfa")  # soft violet, distinct from the shared blue/gold/red/green palette
 
     # Action and state accents
     ACCENT = RANGE

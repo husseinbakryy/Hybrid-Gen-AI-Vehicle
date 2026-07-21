@@ -126,7 +126,8 @@ class DashboardView(QWidget):
         self.progress_panel.startClicked.connect(self._start_trip)
         self.progress_panel.resetClicked.connect(self._reset_trip)
 
-        # Trip timer kept for legacy API but not used for animation when backend is live
+        # Drives the local "simulating trip..." animation loop while a real
+        # recommendation request is in flight - see _start_trip/_tick_trip.
         self.trip_timer = QTimer(self)
         self.trip_timer.timeout.connect(self._tick_trip)
         self._trip_progress = 0.0
@@ -173,10 +174,11 @@ class DashboardView(QWidget):
         has_vehicle = bool(self.trip_form.get_selected_vehicle())
         self.progress_panel.start_btn.setEnabled(self._health_ok and has_vehicle)
 
-
-        self.trip_timer = QTimer(self)
-        self.trip_timer.timeout.connect(self._tick_trip)
-        self._trip_progress = 0.0
+    # The local trip-bar animation runs a single pass of 50 ticks at 100ms
+    # each (see _tick_trip: progress += 2.0 per tick until it reaches 100).
+    # Keep this constant in sync with that math if either number changes -
+    # it's also used to time the stat-tile count-up so both finish together.
+    TRIP_ANIMATION_DURATION_MS = 5000
 
     def _start_trip(self):
         # Build the payload dict using current live form values. This uses
@@ -208,8 +210,9 @@ class DashboardView(QWidget):
         print(json.dumps(payload, indent=2))
         print("===================================\n")
 
-        # Keep computing local segments for the Time/Range Left math, but do
-        # NOT start any animation or set the segmented plan for the UI.
+        # Compute local segments - used to drive the "simulating trip..."
+        # animation once the real response arrives (see
+        # _on_recommendation_result), not while we're waiting on it.
         self._run_dist = self.trip_form.get_distance()
         self._run_speed = self.trip_form.get_speed()
         ev_range = self.trip_form.get_ev_range()
@@ -226,9 +229,11 @@ class DashboardView(QWidget):
             self.trip_form.get_style(),
         )
 
-        # Reset visual stat/state placeholders and show a loading state in the
-        # recommendation panel while we fetch the backend recommendation.
-        self.stat_cards.reset_stats()
+        # Show a loading state in the recommendation panel while we fetch the
+        # backend recommendation. Deliberately do NOT reset_stats() here - the
+        # stat tiles keep showing the previous trip's numbers until the new
+        # response arrives, so animate_extended_stats() counts smoothly from
+        # those values instead of restarting from zero on every trip.
         self.recommendation.set_text("Getting recommendation...")
         self.progress_panel.start_btn.setEnabled(False)
 
@@ -266,10 +271,16 @@ class DashboardView(QWidget):
 
     def _on_recommendation_result(self, success: bool, data: object):
         # This runs in the main thread via the QThread signal connection.
+        # Stop the "simulating trip..." animation the instant we have an
+        # answer (success or failure) - never leave a stale animated frame.
+        self.trip_timer.stop()
         if not success:
             # Show inline error message and keep Start disabled until the
             # next successful health check per requirements.
             self.recommendation.set_text(f"Recommendation request failed: {data}")
+            # Stop the animation cleanly - don't leave a mid-animation
+            # segmented frame frozen on screen indefinitely.
+            self.progress_panel.mode_bar.set_recommended_mode(None)
             # Do not re-enable Start here; wait for health check to re-enable.
             return
 
@@ -335,38 +346,12 @@ class DashboardView(QWidget):
             self.trip_form.get_style(),
         )
 
-        hh, mm = trip_logic.minutes_to_hh_mm(_to_float(trip_time_min))
-        time_str = f"{hh}h {mm}m"
         range_left = _to_float(range_left_km)
 
-        # Update stat tiles: all six values now come from pipeline_predictions.raw
-        try:
-            self.stat_cards.set_extended_stats(
-                _to_float(cost),
-                time_str,
-                _to_float(co2),
-                range_left,
-                _to_float(fuel_used),
-                _to_float(battery_used),
-            )
-        except Exception:
-            # Fallback: set what we can
-            self.stat_cards.set_stats(_to_float(cost), time_str, _to_float(co2), range_left)
-
-        # Update mode badge/bar to show single recommended mode
-        if recommended_mode:
-            self.progress_panel.mode_bar.set_recommended_mode(recommended_mode)
-            # Also update the textual badge shown in the header area
-            if recommended_mode == 'ev':
-                self.progress_panel.set_mode('Electric')
-            elif recommended_mode == 'hybrid':
-                self.progress_panel.set_mode('Hybrid')
-            else:
-                self.progress_panel.set_mode('Gas')
-        else:
-            # No recommendation mode provided; clear badge but keep segmented off
-            self.progress_panel.mode_bar.set_recommended_mode(None)
-            self.progress_panel.set_mode('Ready')
+        # Give the AI recommendation right away - the recommendation panel
+        # text updates immediately, before any local animation plays. The
+        # stat tile NUMBERS are deferred - they count up in sync with the
+        # trip-bar animation below instead of snapping in now.
 
         # Update recommendation panel with genai summary and optional actions
         summary = None
@@ -390,8 +375,58 @@ class DashboardView(QWidget):
             )
             self.recommendation.set_text(text)
 
-        # Re-enable Start when health check is OK and vehicle remains selected
-        self._update_start_enabled()
+        # Update the small header mode badge right away - it's just a text
+        # label, distinct from the segmented mode_bar below, which stays
+        # segmented until the trip animation finishes.
+        if recommended_mode == 'ev':
+            self.progress_panel.set_mode('Electric')
+        elif recommended_mode == 'hybrid':
+            self.progress_panel.set_mode('Hybrid')
+        elif recommended_mode:
+            self.progress_panel.set_mode('Gas')
+        else:
+            self.progress_panel.set_mode('Ready')
+
+        # Compute the real final battery/fuel resting values now, but don't
+        # apply them yet - the animation about to start needs to visibly
+        # drain/refill the mini-bars itself. _finish_animation() applies
+        # these once the single pass completes.
+        try:
+            specs = resp.get('vehicle', {}).get('specifications', {})
+            usable_kwh = specs.get('usableBatteryKwh', 0.0)
+            fuel_tank_l = specs.get('fuelTankL', 0.0)
+            battery_pct = ((usable_kwh - _to_float(battery_used)) / usable_kwh) * 100 if usable_kwh > 0 else 100
+            fuel_pct = ((fuel_tank_l - _to_float(fuel_used)) / fuel_tank_l) * 100 if fuel_tank_l > 0 else 100
+            battery_pct = max(0, min(100, battery_pct))
+            fuel_pct = max(0, min(100, fuel_pct))
+        except Exception:
+            battery_pct = 100
+            fuel_pct = 100
+        self._pending_battery_pct = battery_pct
+        self._pending_fuel_pct = fuel_pct
+        self._pending_mode = recommended_mode
+
+        # NOW play the local trip animation as a single clean pass - see
+        # _tick_trip/_finish_animation for the handoff back to the real
+        # final mode badge and battery/fuel values. Start stays disabled
+        # until _finish_animation() re-enables it, so the user can't
+        # interrupt a playing trip.
+        self.progress_panel.mode_bar.set_recommended_mode(None)
+        self.progress_panel.set_plan(self._run_segments, self._run_stops, self._run_dist)
+        self._trip_progress = 0.0
+        self.trip_timer.start(100)
+
+        # Count the stat tile numbers up over the same single pass, landing
+        # on the real values exactly when the trip-bar animation finishes.
+        self.stat_cards.animate_extended_stats(
+            _to_float(cost),
+            _to_float(trip_time_min),
+            _to_float(co2),
+            range_left,
+            _to_float(fuel_used),
+            _to_float(battery_used),
+            duration=self.TRIP_ANIMATION_DURATION_MS,
+        )
 
     def _segment_at(self, miles: float) -> list:
         for seg in self._run_segments:
@@ -430,8 +465,14 @@ class DashboardView(QWidget):
         self.progress_panel.mode_bar.set_traveled(kilometers)
         self.progress_panel.next_event_label.setText(self._next_event_text(kilometers))
 
+        # NOTE: does NOT call self.progress_panel.set_mode(mode) here anymore -
+        # the small header badge already shows the real recommended_mode text
+        # (set in _on_recommendation_result before this animation started) and
+        # must stay that way; overwriting it with the local per-tick segment
+        # mode left it showing the wrong text once the animation settled
+        # (e.g. "Gas" instead of "Hybrid") while the segmented bar below
+        # correctly settled on the real mode via _finish_animation().
         seg_start, seg_end, mode = self._segment_at(kilometers)
-        self.progress_panel.set_mode(mode)
         if mode == "Electric":
             seg_len = max(0.01, seg_end - seg_start)
             batt = max(0, 100 - ((kilometers - seg_start) / seg_len) * 100)
@@ -446,23 +487,16 @@ class DashboardView(QWidget):
         self.speedometer.setSpeed(self._run_speed + random.uniform(-3, 3))
 
         if finished:
-            self._finish_trip()
+            self._finish_animation()
 
-    def _finish_trip(self):
-        # --- Again, all the actual math lives in trip_logic.py ---
-        stats = trip_logic.compute_trip_stats(
-            self._run_segments,
-            self._run_stops,
-            self._run_dist,
-            self._run_speed,
-            self.trip_form.get_temperature(),
-            self.trip_form.get_traffic(),
-            self.trip_form.get_style(),
-        )
-        self.stat_cards.set_stats(
-            stats["cost"], f"{stats['hh']}h {stats['mm']}m", stats["co2"], stats["range_left"]
-        )
-        text = trip_logic.describe_segments(
-            self._run_segments, self._run_stops, stats["cost"], stats["hh"], stats["mm"]
-        )
-        self.recommendation.set_text(text)
+    def _finish_animation(self):
+        # Called once the single animation pass completes - swap the
+        # segmented bar over to the real final mode badge and settle the
+        # battery/fuel mini-bars on the real resting values computed back
+        # in _on_recommendation_result (rather than the animation's numbers).
+        self.progress_panel.mode_bar.set_recommended_mode(self._pending_mode)
+        self.progress_panel.set_battery(self._pending_battery_pct)
+        self.progress_panel.set_fuel(self._pending_fuel_pct)
+        self.progress_panel.mile_label.setText(f"{round(self._run_dist)} km")
+        self.progress_panel.next_event_label.setText("")
+        self._update_start_enabled()

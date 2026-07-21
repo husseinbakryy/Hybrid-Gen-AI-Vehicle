@@ -190,6 +190,23 @@ def fetch_vehicle_by_id(vehicle_id: str) -> dict[str, Any] | None:
     return _format_vehicle_doc(doc)
 
 
+def fetch_vehicle_by_make_model(make: str, model: str) -> dict[str, Any] | None:
+    col = get_vehicles_collection()
+    if col is None:
+        return None
+
+    query = {
+        "make": {"$regex": f"^{make}$", "$options": "i"},
+        "model": {"$regex": f"^{model}$", "$options": "i"},
+    }
+    # Retrieve the first document matching make and model
+    doc = col.find_one(query)
+    if not doc:
+        return None
+    return _format_vehicle_doc(doc)
+
+
+
 
 
 

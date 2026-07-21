@@ -54,6 +54,8 @@ def predict_trip_structured(
     pred_battery = float(models["m3_battery_energy"].predict(transformed)[0])
     pred_co2 = float(models["m4_co2_emissions"].predict(transformed)[0])
     pred_cost = float(models["m5_trip_cost"].predict(transformed)[0])
+    pred_range_left = float(models["m6_range_left"].predict(transformed)[0])
+    pred_trip_time = float(models["m7_trip_time"].predict(transformed)[0])
 
     raw = {
         "recommended_mode": str(pred_mode),
@@ -61,6 +63,8 @@ def predict_trip_structured(
         "battery_used_kwh": pred_battery,
         "co2_emissions_kg": pred_co2,
         "trip_cost_usd": pred_cost,
+        "range_left_km": pred_range_left,
+        "trip_time_min": pred_trip_time,
     }
 
     formatted = {
@@ -69,6 +73,8 @@ def predict_trip_structured(
         "Predicted Battery Energy Used": f"{raw['battery_used_kwh']:.2f} kWh",
         "Predicted Carbon Footprint": f"{raw['co2_emissions_kg']:.2f} kg of CO2",
         "Predicted Financial Trip Cost": f"${raw['trip_cost_usd']:.2f} USD",
+        "Predicted Remaining Range": f"{raw['range_left_km']:.2f} km",
+        "Predicted Trip Duration": f"{raw['trip_time_min']:.2f} Minutes",
     }
 
     return {"raw": raw, "formatted": formatted}

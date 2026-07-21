@@ -11,7 +11,8 @@ from .model_cost import train_cost_model
 from .model_emissions import train_emissions_model
 from .model_fuel import train_fuel_model
 from .model_mode import train_mode_model
-
+from .model_range import train_range_model
+from .model_time import train_time_model
 
 
 def run_pipeline(data_path: str | Path | None = None, artifact_dir: str | Path = ARTIFACT_DIR):
@@ -68,6 +69,22 @@ def run_pipeline(data_path: str | Path | None = None, artifact_dir: str | Path =
         prepared.y_test[TARGET_MAP["m5_trip_cost"]],
     )
     joblib.dump(cost_model, artifact_dir / MODEL_ASSETS["m5_trip_cost"])
+
+    range_model, metrics["m6_range_left"] = train_range_model(
+        prepared.X_train,
+        prepared.X_test,
+        prepared.y_train[TARGET_MAP["m6_range_left"]],
+        prepared.y_test[TARGET_MAP["m6_range_left"]],
+    )
+    joblib.dump(range_model, artifact_dir / MODEL_ASSETS["m6_range_left"])
+
+    time_model, metrics["m7_trip_time"] = train_time_model(
+        prepared.X_train,
+        prepared.X_test,
+        prepared.y_train[TARGET_MAP["m7_trip_time"]],
+        prepared.y_test[TARGET_MAP["m7_trip_time"]],
+    )
+    joblib.dump(time_model, artifact_dir / MODEL_ASSETS["m7_trip_time"])
 
     print("Training completed. Metrics summary:")
     for model_name, model_metrics in metrics.items():

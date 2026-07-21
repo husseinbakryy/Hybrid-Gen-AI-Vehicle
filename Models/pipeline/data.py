@@ -27,6 +27,14 @@ def load_dataset(data_path: str | Path | None = None) -> pd.DataFrame:
         raise FileNotFoundError(f"Dataset not found at {resolved_path}")
 
     df = pd.read_csv(resolved_path)
+    if "range_left_km" not in df.columns:
+        if "true_battery_soc_end_pct" in df.columns and "nominal_ev_range_km" in df.columns:
+            df["range_left_km"] = df["nominal_ev_range_km"] * (df["true_battery_soc_end_pct"].clip(lower=0, upper=100) / 100.0)
+        elif "battery_soc_end" in df.columns and "nominal_ev_range_km" in df.columns:
+            df["range_left_km"] = df["nominal_ev_range_km"] * (df["battery_soc_end"].clip(lower=0, upper=100) / 100.0)
+        else:
+            df["range_left_km"] = 0.0
+
     required_columns = set(FEATURES + list(TARGET_MAP.values()))
     missing = sorted(required_columns - set(df.columns))
     if missing:
@@ -40,8 +48,8 @@ def prepare_data(df: pd.DataFrame, test_size: float = 0.2, random_state: int = 4
     X = df[FEATURES]
     y = df[list(TARGET_MAP.values())]
 
-    num_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
-    cat_cols = X.select_dtypes(include=["object"]).columns.tolist()
+    num_cols = X.select_dtypes(include="number").columns.tolist()
+    cat_cols = X.select_dtypes(include="object").columns.tolist()
 
     X_train_raw, X_test_raw, y_train, y_test = train_test_split(
         X,

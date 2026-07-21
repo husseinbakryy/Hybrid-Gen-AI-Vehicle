@@ -8,14 +8,22 @@ from typing import Any
 from dotenv import load_dotenv
 
 MongoClient: Any | None = None
+
+ObjectId: Any | None = None
+
 PyMongoError: type[Exception] = Exception
 
 try:
-    _mongo_mod = importlib.import_module("pymongo")
-    MongoClient = _mongo_mod.MongoClient
-    PyMongoError = _mongo_mod.errors.PyMongoError
+    import pymongo
+    from bson import ObjectId
+    from pymongo.errors import PyMongoError
+
+    MongoClient = pymongo.MongoClient
+    ObjectId = ObjectId
+    PyMongoError = PyMongoError
 except ImportError:  # pragma: no cover - optional dependency for local API startup
     MongoClient = None
+    ObjectId = None
     PyMongoError = Exception
 
 
@@ -165,8 +173,39 @@ def fetch_vehicle_by_id(vehicle_id: str) -> dict[str, Any] | None:
     col = get_vehicles_collection()
     if col is None:
         return None
+ 
+    query_id: Any = vehicle_id
+    if ObjectId:
+        try:
+            query_id = ObjectId(vehicle_id)  # Handles MongoDB standard ObjectId format
+        except Exception:
+            pass
+ 
+    doc = col.find_one({"_id": query_id})
+    if not doc and query_id != vehicle_id:
+        doc = col.find_one({"_id": vehicle_id}) # Fallback to standard string lookup
 
-    doc = col.find_one({"_id": vehicle_id})
     if not doc:
         return None
     return _format_vehicle_doc(doc)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

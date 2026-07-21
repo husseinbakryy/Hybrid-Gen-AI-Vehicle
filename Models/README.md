@@ -12,6 +12,8 @@ This folder contains the modular training and inference pipeline for the hybrid 
 - `pipeline/model_battery.py`: Battery usage regression model.
 - `pipeline/model_emissions.py`: Emissions regression model.
 - `pipeline/model_cost.py`: Trip cost regression model.
+- `pipeline/model_range.py`: Remaining range regression model.
+- `pipeline/model_time.py`: Trip time duration regression model.
 - `pipeline/inference.py`: Artifact loading and `predict_trip` inference helper.
 - `pipeline/runner.py`: End-to-end training pipeline orchestrator.
 
@@ -31,8 +33,8 @@ uv run python synthetic_trip_capgemini.py
 
 ## Outputs
 
-Artifacts are written to:
+Artifacts are written to:s
 
 - `Models/artifacts/`
 
-Saved files include the preprocessor and all five trained model artifacts.
+Saved files include the preprocessor and all seven trained model artifacts (`recommended_mode_rf.joblib`, `fuel_used_rf.joblib`, `electric_used_rf.joblib`, `co2_emissions_rf.joblib`, `total_trip_cost_rf.joblib`, `range_left_rf.joblib`, `trip_time_rf.joblib`).

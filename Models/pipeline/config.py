@@ -39,6 +39,8 @@ TARGET_MAP = {
     "m3_battery_energy": "true_battery_used_kwh",
     "m4_co2_emissions": "true_emissions",
     "m5_trip_cost": "estimated_cost",
+    "m6_range_left": "range_left_km",
+    "m7_trip_time": "estimated_time_min",
 }
 
 PREPROCESSOR_FILE = "total_trip_cost_preprocessor.joblib"
@@ -48,4 +50,6 @@ MODEL_ASSETS = {
     "m3_battery_energy": "electric_used_rf.joblib",
     "m4_co2_emissions": "co2_emissions_rf.joblib",
     "m5_trip_cost": "total_trip_cost_rf.joblib",
+    "m6_range_left": "range_left_rf.joblib",
+    "m7_trip_time": "trip_time_rf.joblib",
 }

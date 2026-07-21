@@ -206,6 +206,84 @@ def fetch_vehicle_by_make_model(make: str, model: str) -> dict[str, Any] | None:
     return _format_vehicle_doc(doc)
 
 
+def _next_vehicle_id(col: Any) -> str:
+    """Generate the next sequential vehicle ID (veh_XXXX)."""
+    pipeline = [
+        {"$match": {"_id": {"$regex": "^veh_"}}},
+        {"$project": {"num": {"$toInt": {"$substr": ["$_id", 4, -1]}}}},
+        {"$sort": {"num": -1}},
+        {"$limit": 1},
+    ]
+    results = list(col.aggregate(pipeline))
+    next_num = (results[0]["num"] + 1) if results else 1
+    return f"veh_{next_num:04d}"
+
+
+def insert_vehicle(vehicle_data: dict[str, Any]) -> dict[str, Any]:
+    """Insert a new vehicle document into MongoDB.
+
+    Expects at minimum: make, model, powertrain_type, body_type.
+    Optional but recommended: battery_capacity_kwh, usable_battery_kwh,
+    fuel_tank_l, mass_kg, drag_coeff, frontal_area_m2.
+
+    Returns the formatted vehicle document.
+    """
+    col = get_vehicles_collection()
+    if col is None:
+        raise RuntimeError("Database collection is not available.")
+
+    make = vehicle_data["make"]
+    model = vehicle_data["model"]
+    powertrain_type = vehicle_data["powertrain_type"].lower()
+    body_type = vehicle_data["body_type"].lower()
+
+    # Sensible defaults for optional technical specs
+    battery_cap = float(vehicle_data.get("battery_capacity_kwh", 0.0))
+    usable_bat = float(vehicle_data.get("usable_battery_kwh", 0.0))
+    fuel_tank = float(vehicle_data.get("fuel_tank_l", 0.0))
+    mass_kg = float(vehicle_data.get("mass_kg", 1500.0))
+    drag_coeff = float(vehicle_data.get("drag_coeff", 0.28))
+    frontal_area = float(vehicle_data.get("frontal_area_m2", 2.3))
+
+    # Auto-zero energy sources that don't apply to the powertrain
+    if powertrain_type == "ev":
+        fuel_tank = 0.0
+    elif powertrain_type == "ice":
+        battery_cap = 0.0
+        usable_bat = 0.0
+
+    # Derive nominal EV range: usable_battery / 0.16 kWh per km
+    nominal_ev_range = round(usable_bat / 0.16, 2) if usable_bat > 0 else 0.0
+
+    vehicle_id = _next_vehicle_id(col)
+
+    doc = {
+        "_id": vehicle_id,
+        "make": make,
+        "model": model,
+        "archetype": f"{powertrain_type}_{body_type}",
+        "vehicleName": f"{make} {model}",
+        "specifications": {
+            "powertrainType": powertrain_type,
+            "bodyType": body_type,
+            "batteryCapacityKwh": battery_cap,
+            "usableBatteryKwh": usable_bat,
+            "fuelTankL": fuel_tank,
+            "massKg": mass_kg,
+            "dragCoeff": drag_coeff,
+            "frontalAreaM2": frontal_area,
+            "rollingResistanceCoeff": 0.008,
+            "drivetrainEfficiency": 0.90 if powertrain_type == "ev" else 0.35,
+            "regenEfficiency": 0.70 if powertrain_type != "ice" else 0.0,
+            "hvacBaseKw": 1.8,
+            "cityEfficiencyFactor": 1.0,
+            "highwayEfficiencyFactor": 1.0,
+            "nominalEvRangeKm": nominal_ev_range,
+        },
+    }
+
+    col.insert_one(doc)
+    return _format_vehicle_doc(doc)
 
 
 

@@ -15,7 +15,7 @@ MODELS_DIR = REPO_ROOT / "Models"
 if str(MODELS_DIR) not in sys.path:
     sys.path.insert(0, str(MODELS_DIR))
 
-from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_vehicles
+from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_vehicles, insert_vehicle
 from pipeline.inference import predict_trip_structured
 from recommender import run_recommender_agent
 
@@ -48,6 +48,19 @@ VehicleItem = VehicleDetailItem
 class VehicleListResponse(BaseModel):
     total: int = Field(..., description="Total number of vehicles returned")
     vehicles: list[VehicleSummaryItem] = Field(..., description="List of vehicles")
+
+
+class AddVehicleRequest(BaseModel):
+    make: str = Field(..., description="Brand / manufacturer name", examples=["Toyota"])
+    model: str = Field(..., description="Model name", examples=["Camry"])
+    powertrain_type: str = Field(..., description="Powertrain type: ev, hybrid, or ice", examples=["hybrid"])
+    body_type: str = Field(..., description="Body type: sedan, suv, or hatchback", examples=["sedan"])
+    battery_capacity_kwh: Optional[float] = Field(None, ge=0, description="Total battery capacity in kWh (required for ev/hybrid, 0 for ice)")
+    usable_battery_kwh: Optional[float] = Field(None, ge=0, description="Usable battery capacity in kWh (required for ev/hybrid, 0 for ice)")
+    fuel_tank_l: Optional[float] = Field(None, ge=0, description="Fuel tank capacity in litres (required for ice/hybrid, 0 for ev)")
+    mass_kg: Optional[float] = Field(None, gt=0, description="Vehicle kerb mass in kg (defaults to 1500)")
+    drag_coeff: Optional[float] = Field(None, gt=0, le=1.0, description="Aerodynamic drag coefficient (defaults to 0.28)")
+    frontal_area_m2: Optional[float] = Field(None, gt=0, description="Frontal area in m² (defaults to 2.3)")
 
 
 class TripRecommendationRequest(BaseModel):
@@ -98,6 +111,51 @@ def get_vehicle_by_id(vehicle_id: str):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database query error: {exc}") from exc
+
+
+@app.post("/api/vehicles", status_code=201)
+def add_vehicle(payload: AddVehicleRequest):
+    """Add a new vehicle to the database.
+
+    Required: make, model, powertrain_type, body_type.
+    Optional: battery_capacity_kwh, usable_battery_kwh, fuel_tank_l,
+              mass_kg, drag_coeff, frontal_area_m2.
+    The vehicle ID is auto-generated.
+    """
+    try:
+        pt = payload.powertrain_type.lower()
+        bt = payload.body_type.lower()
+
+        if pt not in ("ev", "hybrid", "ice"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid powertrain_type '{pt}'. Must be one of: ev, hybrid, ice.",
+            )
+        if bt not in ("sedan", "suv", "hatchback"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid body_type '{bt}'. Must be one of: sedan, suv, hatchback.",
+            )
+
+        # Check for duplicate make+model
+        existing = fetch_vehicle_by_make_model(payload.make, payload.model)
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Vehicle '{payload.make} {payload.model}' already exists (id={existing['id']}).",
+            )
+
+        vehicle_dict = payload.model_dump(exclude_none=True)
+        saved = insert_vehicle(vehicle_dict)
+
+        return {
+            "status": "created",
+            "vehicle": saved,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/api/trip/recommendation")

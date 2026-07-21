@@ -128,7 +128,6 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             )
 
         specs = vehicle_doc.get("specifications", {})
-        ev_range = float(vehicle_doc.get("ev_range_km") or specs.get("nominalEvRangeKm") or 0.0)
 
         # 2. Build complete 25-feature input dictionary for ML pipeline
         full_ml_features = {
@@ -160,32 +159,10 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         }
 
         # 3. Run ML Pipeline Inference (predicts all 7 targets)
+        #    Cross-target consistency (mode/energy alignment, CO₂/cost
+        #    re-derivation, range, capacity caps, etc.) is now enforced
+        #    inside predict_trip_structured via _enforce_consistency().
         ml_results = predict_trip_structured(full_ml_features)
-
-        # Domain Guardrail 1: If trip distance exceeds nominal EV range for a hybrid vehicle, enforce hybrid/ice mode
-        powertrain = (specs.get("powertrainType") or vehicle_doc.get("powertrain_type", "")).lower()
-        raw_mode = str(ml_results["raw"].get("recommended_mode", "ev")).lower()
-        if powertrain == "hybrid" and dist_km > ev_range and raw_mode == "ev":
-            ml_results["raw"]["recommended_mode"] = "hybrid"
-            ml_results["formatted"]["Recommended Driving Mode"] = "hybrid"
-
-        # Domain Guardrail 2: Dynamic Remaining Range Post-Processing (replaces stagnant ML artifact predictions)
-        usable_bat = float(specs.get("usableBatteryKwh") or specs.get("batteryCapacityKwh") or 1.0)
-        fuel_tank = float(specs.get("fuelTankL") or 0.0)
-        bat_used = float(ml_results["raw"].get("battery_used_kwh", 0.0))
-        fuel_used = float(ml_results["raw"].get("fuel_used_l", 0.0))
-
-        bat_pct_left = max(0.0, (usable_bat - min(bat_used, usable_bat)) / max(usable_bat, 1e-3))
-        rem_ev = bat_pct_left * ev_range
-        fuel_pct_left = max(0.0, (fuel_tank - min(fuel_used, fuel_tank)) / max(fuel_tank, 1e-3)) if fuel_tank > 0 else 0.0
-        rem_fuel = fuel_pct_left * fuel_tank * 12.0
-        calc_range_left = round(rem_ev + rem_fuel, 2)
-
-        # Apply dynamic calculated range if ML model range is stagnant or unrealistic
-        ml_range = float(ml_results["raw"].get("range_left_km", 0.0))
-        if abs(ml_range - 11.23) < 1.0 or ml_range <= 0 or calc_range_left != ml_range:
-            ml_results["raw"]["range_left_km"] = calc_range_left
-            ml_results["formatted"]["Predicted Remaining Range"] = f"{calc_range_left:.2f} km"
 
 
         # 4. Synthesize with GenAI Recommender Agent

@@ -53,3 +53,14 @@ MODEL_ASSETS = {
     "m6_range_left": "range_left_rf.joblib",
     "m7_trip_time": "trip_time_rf.joblib",
 }
+
+# ---------------------------------------------------------------------------
+# Domain constants for the post-prediction consistency layer
+# ---------------------------------------------------------------------------
+CO2_PER_LITER_FUEL = 2.31        # kg CO₂ per litre of gasoline
+CO2_PER_KWH_GRID = 0.37         # kg CO₂ per kWh (grid-average electricity)
+FUEL_PRICE_PER_LITER = 1.50     # USD per litre
+ELEC_PRICE_PER_KWH = 0.15       # USD per kWh
+EV_CONSUMPTION_KWH_PER_KM = 0.16  # kWh/km (matches Range.py assumption)
+AVG_FUEL_ECONOMY_KM_PER_L = 12.0  # km per litre (average fuel economy)
+MAX_SPEED_KMH = 120.0           # maximum plausible average speed

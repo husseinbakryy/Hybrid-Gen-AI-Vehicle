@@ -12,6 +12,7 @@ load_dotenv(override=True)
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 DEFAULT_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o")
 
+
 def build_agent_prompt(
     user_input: dict[str, Any],
     vehicle_data: dict[str, Any],
@@ -43,6 +44,7 @@ def build_agent_prompt(
         "}"
     )
 
+
 def _extract_json(text: str) -> dict[str, Any]:
     cleaned = text.strip()
     if cleaned.startswith("```"):
@@ -63,6 +65,7 @@ def _extract_json(text: str) -> dict[str, Any]:
         raise ValueError("GenAI response was not a JSON object.")
 
     return parsed
+
 
 def run_recommender_agent(
     user_input: dict[str, Any],

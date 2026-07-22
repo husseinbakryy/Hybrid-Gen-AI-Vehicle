@@ -131,6 +131,10 @@ class DashboardView(QWidget):
         self.trip_timer = QTimer(self)
         self.trip_timer.timeout.connect(self._tick_trip)
         self._trip_progress = 0.0
+        # Stores the segments used by the live animation (set in
+        # _on_recommendation_result). Initialised empty so _segment_at()'s
+        # defensive guard always has a defined attribute to check against.
+        self._animation_segments: list = []
 
     def _start_health_check(self):
         # Spawn a short-lived thread to perform the health check without
@@ -221,6 +225,13 @@ class DashboardView(QWidget):
         load_factor = 1 + 0.02 * (pax - 1)
         self._run_stops = []
 
+        # NOTE: self._run_segments is used ONLY by the describe_segments()
+        # fallback text path in _on_recommendation_result() (when the AI
+        # response arrives with no summary). It is NOT used by the animation
+        # anymore - the animation now reads self._animation_segments, which is
+        # built from the real backend recommended_mode via
+        # mode_to_animation_segments(). Both sources live side by side
+        # intentionally; do not merge them.
         self._run_segments = trip_logic.compute_mode_segments(
             self._run_dist,
             ev_range / load_factor if load_factor else 0,
@@ -416,7 +427,10 @@ class DashboardView(QWidget):
         animation_segments = trip_logic.mode_to_animation_segments(
             recommended_mode, self._run_dist
         )
-        self.progress_panel.set_plan(animation_segments, [], self._run_dist)
+        # Store as an instance attribute so _segment_at(), _cumulative_gas_before(),
+        # and _tick_trip() all read the SAME segments as the visual mode_bar.
+        self._animation_segments = animation_segments
+        self.progress_panel.set_plan(self._animation_segments, [], self._run_dist)
         self._trip_progress = 0.0
         self.trip_timer.start(100)
 
@@ -433,14 +447,21 @@ class DashboardView(QWidget):
         )
 
     def _segment_at(self, miles: float) -> list:
-        for seg in self._run_segments:
+        # Defensive guard: if _animation_segments hasn't been set yet (e.g.
+        # the timer somehow fires before the first trip response arrives),
+        # return a safe default rather than raising AttributeError/IndexError.
+        segs = getattr(self, '_animation_segments', [])
+        if not segs:
+            return [0, max(1.0, getattr(self, '_run_dist', 1.0)), "Gas"]
+        for seg in segs:
             if seg[0] <= miles < seg[1]:
                 return seg
-        return self._run_segments[-1]
+        return segs[-1]
 
     def _cumulative_gas_before(self, miles: float) -> float:
         total = 0.0
-        for start, end, mode in self._run_segments:
+        segs = getattr(self, '_animation_segments', [])
+        for start, end, mode in segs:
             if mode != "Gas" or miles <= start:
                 continue
             total += min(miles, end) - start
@@ -483,7 +504,7 @@ class DashboardView(QWidget):
             self.progress_panel.set_battery(batt)
         else:
             self.progress_panel.set_battery(0)
-            total_gas = sum(e - s for s, e, m in self._run_segments if m == "Gas")
+            total_gas = sum(e - s for s, e, m in getattr(self, '_animation_segments', []) if m == "Gas")
             gas_so_far = self._cumulative_gas_before(kilometers)
             fuel_pct = 100 - (gas_so_far / total_gas) * 40 if total_gas > 0 else 100
             self.progress_panel.set_fuel(max(0, fuel_pct))

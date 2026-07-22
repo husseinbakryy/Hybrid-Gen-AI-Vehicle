@@ -38,20 +38,12 @@ QPushButton#Secondary {{
 QPushButton#Secondary:hover {{
     background-color: {Colors.CARD.name()};
 }}
-QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit {{
+QComboBox, QSpinBox {{
     background-color: {Colors.CARD_HOVER.name()};
     color: {Colors.TEXT.name()};
     border: 1px solid {Colors.BORDER.name()};
     border-radius: 6px;
     padding: 4px;
-}}
-QComboBox QAbstractItemView {{
-    background-color: {Colors.CARD_HOVER.name()};
-    color: {Colors.TEXT.name()};
-    border: 1px solid {Colors.BORDER.name()};
-    selection-background-color: {Colors.RANGE.name()};
-    selection-color: {Colors.TEXT.name()};
-    outline: none;
 }}
 QSlider::groove:horizontal {{
     height: 4px;

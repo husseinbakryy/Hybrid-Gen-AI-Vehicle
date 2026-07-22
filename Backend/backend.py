@@ -77,6 +77,25 @@ app = FastAPI(
 )
 
 
+def _async_generate_and_play_tts(text: str):
+    try:
+        audio_path = generate_tts_audio(text)
+        if audio_path:
+            play_audio_file(audio_path)
+    except Exception as audio_exc:
+        print(f"[TTS] Background audio generation/playback failed: {audio_exc}")
+
+
+@app.on_event("startup")
+def prewarm_assets():
+    try:
+        from pipeline.inference import load_assets
+        load_assets()
+        print("[Backend Startup] Pre-loaded ML pipeline models into memory.")
+    except Exception as exc:
+        print(f"[Backend Startup] Warning: ML pre-warm failed: {exc}")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -226,18 +245,11 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             user_context=user_context,
         )
 
-        audio_ready = False
         summary_text = ""
         if isinstance(agent_recommendation, dict):
             summary_text = agent_recommendation.get("summary", "")
         if summary_text:
-            try:
-                audio_path = generate_tts_audio(summary_text)
-                if audio_path:
-                    audio_ready = True
-                    threading.Thread(target=play_audio_file, args=(audio_path,), daemon=True).start()
-            except Exception as audio_exc:
-                print(f"[TTS] Audio generation failed (non-fatal): {audio_exc}")
+            threading.Thread(target=_async_generate_and_play_tts, args=(summary_text,), daemon=True).start()
 
         return {
             "status": "success",
@@ -247,7 +259,7 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             "pipeline_predictions": ml_results,
             "agent_recommendation": agent_recommendation,
             "play_audio": {
-                "audio_ready": audio_ready
+                "audio_ready": True
             }
         }
     except HTTPException:

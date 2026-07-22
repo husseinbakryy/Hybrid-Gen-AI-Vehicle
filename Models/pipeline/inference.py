@@ -25,7 +25,14 @@ def _asset_path(artifact_dir: str | Path, filename: str) -> Path:
 
 
 
+_CACHED_ASSETS = None
+
+
 def load_assets(artifact_dir: str | Path = ARTIFACT_DIR):
+    global _CACHED_ASSETS
+    if _CACHED_ASSETS is not None:
+        return _CACHED_ASSETS
+
     artifact_dir = Path(artifact_dir)
 
     preprocessor_path = _asset_path(artifact_dir, PREPROCESSOR_FILE)
@@ -41,7 +48,8 @@ def load_assets(artifact_dir: str | Path = ARTIFACT_DIR):
             raise FileNotFoundError(f"Missing model artifact: {model_path}")
         models[key] = joblib.load(model_path)
 
-    return preprocessor, models
+    _CACHED_ASSETS = (preprocessor, models)
+    return _CACHED_ASSETS
 
 
 # ---------------------------------------------------------------------------

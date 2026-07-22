@@ -190,7 +190,14 @@ def fetch_vehicle_by_id(vehicle_id: str) -> dict[str, Any] | None:
     return _format_vehicle_doc(doc)
 
 
+_VEHICLE_MAKE_MODEL_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
+
+
 def fetch_vehicle_by_make_model(make: str, model: str) -> dict[str, Any] | None:
+    cache_key = (make.lower().strip(), model.lower().strip())
+    if cache_key in _VEHICLE_MAKE_MODEL_CACHE:
+        return dict(_VEHICLE_MAKE_MODEL_CACHE[cache_key])
+
     col = get_vehicles_collection()
     if col is None:
         return None
@@ -203,7 +210,9 @@ def fetch_vehicle_by_make_model(make: str, model: str) -> dict[str, Any] | None:
     doc = col.find_one(query)
     if not doc:
         return None
-    return _format_vehicle_doc(doc)
+    res = _format_vehicle_doc(doc)
+    _VEHICLE_MAKE_MODEL_CACHE[cache_key] = res
+    return dict(res)
 
 
 def _next_vehicle_id(col: Any) -> str:

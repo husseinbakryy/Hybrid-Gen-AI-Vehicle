@@ -91,7 +91,7 @@ class TripSetupForm(Card):
         self.speed_value_label = self._label("Avg speed: 45 km/h")
         self.add_widget(self.speed_value_label)
         self.speed_slider = QSlider(Qt.Orientation.Horizontal)
-        self.speed_slider.setRange(0, 120)
+        self.speed_slider.setRange(1, 120)
         self.speed_slider.setValue(45)
         self.add_widget(self.speed_slider)
 

@@ -297,6 +297,7 @@ def build_trip_payload(
     road_type: str = "urban",
     traffic: str = "Medium",
     distance: float = 10.0,
+    speed: float = 45.0,
     passengers: int = 1,
     cargo: float = 0.0,
     style: str = "Normal",
@@ -325,6 +326,11 @@ def build_trip_payload(
             "road_type": road_type,
             "traffic_level": traffic_level_to_float(traffic),
             "distance_km": distance,
+            # NOTE: not yet a model feature - Models/pipeline/config.py's
+            # FEATURES list doesn't include this. Included here so the payload
+            # already carries it once the ML/backend team wires up support.
+            # Currently silently ignored by the backend.
+            "avg_speed_kmh": speed,
             "passengers": passengers,
             "cargo_kg": cargo,
         },

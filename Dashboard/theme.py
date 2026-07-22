@@ -102,7 +102,7 @@ class Buttons:
 
 
 class SpeedometerTheme:
-    MIN_SPEED = 0
+    MIN_SPEED = 1
     MAX_SPEED = 120
     NEEDLE_WIDTH = 3
     ARC_WIDTH = 12

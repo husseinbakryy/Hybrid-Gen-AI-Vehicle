@@ -93,7 +93,12 @@ class Speedometer(QWidget):
 
     def _draw_ticks(self, painter, center, radius):
         painter.setPen(QPen(Colors.TEXT_SECONDARY, 2))
-        for value in range(SpeedometerTheme.MIN_SPEED, SpeedometerTheme.MAX_SPEED + 1, 10):
+        # Intentionally hardcoded to 0, NOT SpeedometerTheme.MIN_SPEED - these
+        # are reference marks on the dial face, not exact selectable values,
+        # so they should always read a clean 0, 10, 20...120 regardless of
+        # what the actual functional floor is. The real minimum is enforced
+        # elsewhere (the speed slider's range and setSpeed()'s clamp below).
+        for value in range(0, SpeedometerTheme.MAX_SPEED + 1, 10):
             angle = radians(225 - (270 * value / SpeedometerTheme.MAX_SPEED))
             outer, inner = radius - 8, radius - 24
             x1 = center.x() + outer * cos(angle)

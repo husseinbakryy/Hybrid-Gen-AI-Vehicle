@@ -196,6 +196,7 @@ class DashboardView(QWidget):
                 road_type=self.trip_form.get_road_type(),
                 traffic=self.trip_form.get_traffic(),
                 distance=self.trip_form.get_distance(),
+                speed=self.trip_form.get_speed(),
                 passengers=self.trip_form.get_passengers(),
                 cargo=self.trip_form.get_cargo_kg(),
                 style=self.trip_form.get_style(),

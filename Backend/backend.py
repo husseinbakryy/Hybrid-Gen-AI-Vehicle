@@ -219,9 +219,6 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         }
 
         # 3. Run ML Pipeline Inference (predicts all 7 targets)
-        #    Cross-target consistency (mode/energy alignment, CO₂/cost
-        #    re-derivation, range, capacity caps, etc.) is now enforced
-        #    inside predict_trip_structured via _enforce_consistency().
         ml_results = predict_trip_structured(full_ml_features)
 
         # 3b. Refine trip time using user-supplied avg_speed_kmh
@@ -229,7 +226,7 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         if avg_speed > 0 and dist_km > 0:
             base_time_min = (dist_km / avg_speed) * 60.0
             traffic = float(trip_input.get("traffic_level", 0.0))
-            traffic_multiplier = 1.0 + 0.5 * traffic          # 0→×1.0 … 1→×1.5
+            traffic_multiplier = 1.0 + 0.5 * traffic
             refined_time = round(base_time_min * traffic_multiplier, 2)
             ml_results["raw"]["trip_time_min"] = refined_time
             ml_results["formatted"]["Predicted Trip Duration"] = f"{refined_time:.2f} Minutes"
@@ -242,20 +239,19 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             user_context=user_context,
         )
 
-        # 5. Generate TTS audio from the recommendation summary (non-blocking)
-        audio_base64: Optional[str] = None
+        # 5. Generate TTS audio and play in background (omitting base64 string from response)
+        audio_ready = False
         summary_text = ""
         if isinstance(agent_recommendation, dict):
             summary_text = agent_recommendation.get("summary", "")
         if summary_text:
             try:
-                audio_base64, audio_path = generate_tts_audio(summary_text)
-                # Auto-play in background thread so we don't block the response
+                _, audio_path = generate_tts_audio(summary_text)
                 if audio_path:
+                    audio_ready = True
                     threading.Thread(target=play_audio_file, args=(audio_path,), daemon=True).start()
             except Exception as audio_exc:
                 print(f"[TTS] Audio generation failed (non-fatal): {audio_exc}")
-                audio_base64 = None
 
         return {
             "status": "success",
@@ -264,13 +260,14 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             "user_context": user_context,
             "pipeline_predictions": ml_results,
             "agent_recommendation": agent_recommendation,
-            "audio_base64": audio_base64,
+            "play_audio": {
+                "audio_ready": audio_ready
+            }
         }
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-
 
 
 if __name__ == "__main__":

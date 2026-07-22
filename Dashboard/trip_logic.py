@@ -195,6 +195,24 @@ def compute_mode_segments(distance: float, ev_range: float, stops: list[int],
     return merged
 
 
+def mode_to_animation_segments(recommended_mode: str | None,
+                                distance: float) -> list[list]:
+    """Build display segments for the live trip animation directly
+    from the backend's real recommended_mode, NOT from local ev_range
+    math. This is a simple illustrative visual split (not a physically
+    predicted switch point - the model doesn't return one), so hybrid
+    trips always show a 50/50 split for animation purposes only."""
+    mode = (recommended_mode or "").lower()
+    if mode == "ev":
+        return [[0, distance, "Electric"]]
+    elif mode == "hybrid":
+        midpoint = distance / 2
+        return [[0, midpoint, "Electric"], [midpoint, distance, "Gas"]]
+    else:
+        # ice, unknown, or missing - default to Gas for the full trip
+        return [[0, distance, "Gas"]]
+
+
 def compute_trip_stats(segments: list[list], stops: list[int], distance: float,
                         speed: float, temperature: int | None = None,
                         traffic: str | None = None, style: str | None = None) -> dict:

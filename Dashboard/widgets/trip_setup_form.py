@@ -23,6 +23,7 @@ class TripSetupForm(Card):
     def __init__(self, parent=None):
         super().__init__("Trip Setup", Colors.RANGE)
         self.setFixedWidth(260)
+        self._ev_range_warned: set[str] = set()
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
@@ -286,7 +287,6 @@ class TripSetupForm(Card):
                 return 0
             val = trip_logic.NOMINAL_EV_RANGE_KM.get(sel)
             if val is None:
-                print(f"[trip_setup_form] Warning: no nominal EV range for '{sel}', defaulting to 0 km")
                 return 0
             return val
         except Exception:

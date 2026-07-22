@@ -413,7 +413,10 @@ class DashboardView(QWidget):
         # until _finish_animation() re-enables it, so the user can't
         # interrupt a playing trip.
         self.progress_panel.mode_bar.set_recommended_mode(None)
-        self.progress_panel.set_plan(self._run_segments, self._run_stops, self._run_dist)
+        animation_segments = trip_logic.mode_to_animation_segments(
+            recommended_mode, self._run_dist
+        )
+        self.progress_panel.set_plan(animation_segments, [], self._run_dist)
         self._trip_progress = 0.0
         self.trip_timer.start(100)
 

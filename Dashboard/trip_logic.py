@@ -87,13 +87,15 @@ def fetch_vehicle_catalog(base_url: str = "http://localhost:8000", timeout: floa
         out = {}
         for v in vehicles:
             vehicle_name = v.get("vehicle_name")
-            name = v.get("name")
+            name = v.get("name") or v.get("make")
             body_type = v.get("body_type")
-            power_train_type = v.get("power_train_type")
+            power_train_type = v.get("power_train_type") or v.get("powertrain_type")
 
-            if not vehicle_name or not name:
+            if not vehicle_name:
                 # Skip malformed entries but continue processing others
                 continue
+            if not name:
+                name = vehicle_name.split()[0]
 
             make = name
             model = vehicle_name
@@ -104,12 +106,22 @@ def fetch_vehicle_catalog(base_url: str = "http://localhost:8000", timeout: floa
                 # Degrade gracefully if naming doesn't match - log a warning.
                 print(f"[trip_logic] Warning: vehicle_name '{vehicle_name}' does not start with name '{name}', using full vehicle_name as model")
 
+            specs = v.get("specifications", {}) if isinstance(v.get("specifications"), dict) else {}
+            ev_range = (
+                v.get("ev_range_km")
+                or specs.get("nominalEvRangeKm")
+                or specs.get("nominal_ev_range_km")
+                or v.get("usable_battery_kwh")
+                or specs.get("usableBatteryKwh")
+            )
+
             display = vehicle_name
             out[display] = {
                 "make": make,
                 "model": model,
                 "body_type": body_type,
                 "powertrain_type_display": power_train_type,
+                "ev_range_km": ev_range,
             }
 
         if not out:

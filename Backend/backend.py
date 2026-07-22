@@ -57,12 +57,12 @@ class AddVehicleRequest(BaseModel):
     model: str = Field(..., description="Model name", examples=["Camry"])
     powertrain_type: str = Field(..., description="Powertrain type: ev, hybrid, or ice", examples=["hybrid"])
     body_type: str = Field(..., description="Body type: sedan, suv, or hatchback", examples=["sedan"])
-    battery_capacity_kwh: Optional[float] = Field(None, ge=0, description="Total battery capacity in kWh (required for ev/hybrid, 0 for ice)")
-    usable_battery_kwh: Optional[float] = Field(None, ge=0, description="Usable battery capacity in kWh (required for ev/hybrid, 0 for ice)")
-    fuel_tank_l: Optional[float] = Field(None, ge=0, description="Fuel tank capacity in litres (required for ice/hybrid, 0 for ev)")
-    mass_kg: Optional[float] = Field(None, gt=0, description="Vehicle kerb mass in kg (defaults to 1500)")
-    drag_coeff: Optional[float] = Field(None, gt=0, le=1.0, description="Aerodynamic drag coefficient (defaults to 0.28)")
-    frontal_area_m2: Optional[float] = Field(None, gt=0, description="Frontal area in m² (defaults to 2.3)")
+    battery_capacity_kwh: Optional[float] = Field(None, ge=0, description="Total battery capacity in kWh")
+    usable_battery_kwh: Optional[float] = Field(None, ge=0, description="Usable battery capacity in kWh")
+    fuel_tank_l: Optional[float] = Field(None, ge=0, description="Fuel tank capacity in litres")
+    mass_kg: Optional[float] = Field(None, gt=0, description="Vehicle kerb mass in kg")
+    drag_coeff: Optional[float] = Field(None, gt=0, le=1.0, description="Aerodynamic drag coefficient")
+    frontal_area_m2: Optional[float] = Field(None, gt=0, description="Frontal area in m²")
 
 
 class TripRecommendationRequest(BaseModel):
@@ -72,8 +72,8 @@ class TripRecommendationRequest(BaseModel):
 
 app = FastAPI(
     title="Hybrid Vehicle Recommendation AI API",
-    version="1.0.0",
-    description="Integrates database specs, ML telemetry, and Agent AI recommendations.",
+    version="1.7",
+    description="Integrates database specs, fast ML telemetry, and Agent AI recommendations.",
 )
 
 
@@ -117,13 +117,6 @@ def get_vehicle_by_id(vehicle_id: str):
 
 @app.post("/api/vehicles", status_code=201)
 def add_vehicle(payload: AddVehicleRequest):
-    """Add a new vehicle to the database.
-
-    Required: make, model, powertrain_type, body_type.
-    Optional: battery_capacity_kwh, usable_battery_kwh, fuel_tank_l,
-              mass_kg, drag_coeff, frontal_area_m2.
-    The vehicle ID is auto-generated.
-    """
     try:
         pt = payload.powertrain_type.lower()
         bt = payload.body_type.lower()
@@ -139,7 +132,6 @@ def add_vehicle(payload: AddVehicleRequest):
                 detail=f"Invalid body_type '{bt}'. Must be one of: sedan, suv, hatchback.",
             )
 
-        # Check for duplicate make+model
         existing = fetch_vehicle_by_make_model(payload.make, payload.model)
         if existing:
             raise HTTPException(
@@ -176,10 +168,9 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         if dist_km <= 0 or dist_km > 3000:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid distance_km ({dist_km}): must be between 0.1 km and 3,000 km for realistic trip planning.",
+                detail=f"Invalid distance_km ({dist_km}): must be between 0.1 km and 3,000 km.",
             )
 
-        # 1. Fetch vehicle specifications from MongoDB by make & model (returns first matching document)
         vehicle_doc = fetch_vehicle_by_make_model(make, model)
         if not vehicle_doc:
             raise HTTPException(
@@ -189,7 +180,6 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
 
         specs = vehicle_doc.get("specifications", {})
 
-        # 2. Build complete 25-feature input dictionary for ML pipeline
         full_ml_features = {
             "make": make,
             "model": model,
@@ -218,10 +208,8 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             "cargo_kg": float(trip_input.get("cargo_kg", 0.0)),
         }
 
-        # 3. Run ML Pipeline Inference (predicts all 7 targets)
         ml_results = predict_trip_structured(full_ml_features)
 
-        # 3b. Refine trip time using user-supplied avg_speed_kmh
         avg_speed = float(trip_input.get("avg_speed_kmh", 0.0))
         if avg_speed > 0 and dist_km > 0:
             base_time_min = (dist_km / avg_speed) * 60.0
@@ -231,7 +219,6 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             ml_results["raw"]["trip_time_min"] = refined_time
             ml_results["formatted"]["Predicted Trip Duration"] = f"{refined_time:.2f} Minutes"
 
-        # 4. Synthesize with GenAI Recommender Agent
         agent_recommendation = run_recommender_agent(
             user_input=trip_input,
             vehicle_data=vehicle_doc,
@@ -239,14 +226,13 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             user_context=user_context,
         )
 
-        # 5. Generate TTS audio and play in background (omitting base64 string from response)
         audio_ready = False
         summary_text = ""
         if isinstance(agent_recommendation, dict):
             summary_text = agent_recommendation.get("summary", "")
         if summary_text:
             try:
-                _, audio_path = generate_tts_audio(summary_text)
+                audio_path = generate_tts_audio(summary_text)
                 if audio_path:
                     audio_ready = True
                     threading.Thread(target=play_audio_file, args=(audio_path,), daemon=True).start()

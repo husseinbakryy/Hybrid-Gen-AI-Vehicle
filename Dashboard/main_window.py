@@ -161,9 +161,9 @@ class DashboardView(QWidget):
             self.trip_form.vehicle_label.setText("Backend unreachable — vehicle list unavailable")
             self.trip_form.vehicle_combo.setEnabled(False)
         else:
-            # Clear any inline error message if catalog exists
+            # Restore normal vehicle label (e.g. Vehicle (SUV)) if catalog exists
             if trip_logic.VEHICLE_CATALOG:
-                self.trip_form.vehicle_label.setText("")
+                self.trip_form._update_vehicle_label()
                 self.trip_form.vehicle_combo.setEnabled(True)
         self._update_start_enabled()
 

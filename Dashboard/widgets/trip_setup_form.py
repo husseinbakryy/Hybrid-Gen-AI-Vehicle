@@ -80,6 +80,13 @@ class TripSetupForm(Card):
         self.vehicle_combo.setEnabled(False)
         self.add_widget(self.vehicle_combo)
 
+        # Own row below the combo rather than sharing one with it - vehicle
+        # display names (e.g. "Terra Trail H (SUV - 61.0 km EV)") already
+        # crowd this 260px-wide sidebar on their own.
+        self.add_vehicle_btn = QPushButton("+ Add Vehicle")
+        self.add_vehicle_btn.setObjectName("Secondary")
+        self.add_widget(self.add_vehicle_btn)
+
         self._update_vehicle_label()
 
         self.add_widget(self._label("Distance (km)"))
@@ -190,6 +197,8 @@ class TripSetupForm(Card):
             self._update_vehicle_label
         )
 
+        self.add_vehicle_btn.clicked.connect(self._on_add_vehicle_clicked)
+
     def add_widget(self, widget):
         self.form_layout.addWidget(widget)
 
@@ -203,6 +212,43 @@ class TripSetupForm(Card):
         lbl = QLabel(text)
         lbl.setStyleSheet(f"color: {Colors.TEXT_DISABLED.name()}; font-size: 12px;")
         return lbl
+
+    def _on_add_vehicle_clicked(self):
+        # Local import, same pattern as the trip_logic imports elsewhere in
+        # this file - keeps the dialog as an optional/internal dependency
+        # rather than a module-level import every caller of this file pays for.
+        from widgets.add_vehicle_dialog import AddVehicleDialog
+
+        dialog = AddVehicleDialog(self)
+        dialog.vehicleAdded.connect(self.refresh_vehicle_catalog)
+        dialog.exec()
+
+    def refresh_vehicle_catalog(self, select_name: str = ""):
+        """Re-fetch the live vehicle catalog (same hybrid-only default as
+        fetch_vehicle_catalog()) and repopulate the dropdown - called after
+        AddVehicleDialog successfully adds a new vehicle, selecting it by
+        name if it's present in the refreshed list.
+
+        NOTE: this duplicates the few fetch/populate lines already in
+        main_window.py's startup code rather than sharing a helper - the
+        failure-mode UX genuinely differs between the two call sites.
+        Startup shows a "Backend unreachable" message and disables the
+        combo on failure; here, a failed refresh right after a successful
+        add just leaves the dropdown as-is rather than surprising the user
+        by disabling a control they were just successfully using.
+        """
+        import trip_logic
+        fetched = trip_logic.fetch_vehicle_catalog()
+        if not fetched:
+            return
+        trip_logic.VEHICLE_CATALOG = fetched
+        self.vehicle_combo.clear()
+        for name in fetched.keys():
+            self.vehicle_combo.addItem(name)
+        self.vehicle_combo.setEnabled(True)
+        if select_name in fetched:
+            self.vehicle_combo.setCurrentText(select_name)
+        self._update_vehicle_label()
 
     def _update_vehicle_label(self):
         vehicle = self.vehicle_combo.currentText()

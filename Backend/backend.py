@@ -194,13 +194,7 @@ def get_vehicle_by_id(vehicle_id: str):
 def trip_recommendation_endpoint(payload: TripRecommendationRequest):
     global LATEST_AUDIO_PATH
     try:
-<<<<<<< Updated upstream
-        trip_input = payload.trip_input
-      
-        user_context = payload.user_context or {}
-=======
         trip_input, user_context, vehicle_id = _normalize_trip_payload(payload)
->>>>>>> Stashed changes
 
         make = trip_input.get("make")
         model = trip_input.get("model")
@@ -267,7 +261,9 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             except Exception:
                 ml_results = None
 
-<<<<<<< Updated upstream
+        if not ml_results:
+            ml_results = _compute_smart_fallback(full_ml_features)
+
         # 3b. Refine trip time using user-supplied avg_speed_kmh
         avg_speed = float(trip_input.get("avg_speed_kmh", 0.0))
         if avg_speed > 0 and dist_km > 0:
@@ -277,10 +273,6 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             refined_time = round(base_time_min * traffic_multiplier, 2)
             ml_results["raw"]["trip_time_min"] = refined_time
             ml_results["formatted"]["Predicted Trip Duration"] = f"{refined_time:.2f} Minutes"
-=======
-        if not ml_results:
-            ml_results = _compute_smart_fallback(full_ml_features)
->>>>>>> Stashed changes
 
         agent_recommendation = run_recommender_agent(
             user_input=trip_input,

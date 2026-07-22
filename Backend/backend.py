@@ -162,6 +162,7 @@ def add_vehicle(payload: AddVehicleRequest):
 def trip_recommendation_endpoint(payload: TripRecommendationRequest):
     try:
         trip_input = payload.trip_input
+      
         user_context = payload.user_context or {}
 
         make = trip_input.get("make")
@@ -222,6 +223,15 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         #    inside predict_trip_structured via _enforce_consistency().
         ml_results = predict_trip_structured(full_ml_features)
 
+        # 3b. Refine trip time using user-supplied avg_speed_kmh
+        avg_speed = float(trip_input.get("avg_speed_kmh", 0.0))
+        if avg_speed > 0 and dist_km > 0:
+            base_time_min = (dist_km / avg_speed) * 60.0
+            traffic = float(trip_input.get("traffic_level", 0.0))
+            traffic_multiplier = 1.0 + 0.5 * traffic          # 0→×1.0 … 1→×1.5
+            refined_time = round(base_time_min * traffic_multiplier, 2)
+            ml_results["raw"]["trip_time_min"] = refined_time
+            ml_results["formatted"]["Predicted Trip Duration"] = f"{refined_time:.2f} Minutes"
 
         # 4. Synthesize with GenAI Recommender Agent
         agent_recommendation = run_recommender_agent(

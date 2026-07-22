@@ -326,10 +326,7 @@ def build_trip_payload(
             "road_type": road_type,
             "traffic_level": traffic_level_to_float(traffic),
             "distance_km": distance,
-            # NOTE: not yet a model feature - Models/pipeline/config.py's
-            # FEATURES list doesn't include this. Included here so the payload
-            # already carries it once the ML/backend team wires up support.
-            # Currently silently ignored by the backend.
+            # Used by backend for physics-based trip time calculation
             "avg_speed_kmh": speed,
             "passengers": passengers,
             "cargo_kg": cargo,

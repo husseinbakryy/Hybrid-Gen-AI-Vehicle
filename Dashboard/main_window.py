@@ -178,11 +178,12 @@ class DashboardView(QWidget):
         has_vehicle = bool(self.trip_form.get_selected_vehicle())
         self.progress_panel.start_btn.setEnabled(self._health_ok and has_vehicle)
 
-    # The local trip-bar animation runs a single pass of 50 ticks at 100ms
-    # each (see _tick_trip: progress += 2.0 per tick until it reaches 100).
-    # Keep this constant in sync with that math if either number changes -
-    # it's also used to time the stat-tile count-up so both finish together.
-    TRIP_ANIMATION_DURATION_MS = 5000
+    # The local trip-bar animation runs a single pass of ~150 ticks at
+    # 100ms each (see _tick_trip: progress += 0.6667 per tick until it
+    # reaches 100). Keep this constant in sync with that math if either
+    # number changes - it's also used to time the stat-tile count-up so
+    # both finish together.
+    TRIP_ANIMATION_DURATION_MS = 15000
 
     def _start_trip(self):
         # Build the payload dict using current live form values. This uses
@@ -476,10 +477,12 @@ class DashboardView(QWidget):
         if next_stop is not None and (next_switch is None or next_stop <= next_switch):
             return f"charging stop at {round(next_stop)} km"
         other_mode = "Gas" if mode == "Electric" else "Electric"
+        if next_switch is None:  # unreachable given the guards above, but satisfies the type checker
+            return "no more events"
         return f"switch to {other_mode} at {round(next_switch)} km"
 
     def _tick_trip(self):
-        self._trip_progress += 2.0
+        self._trip_progress += 0.6667
         finished = self._trip_progress >= 100
         if finished:
             self._trip_progress = 100

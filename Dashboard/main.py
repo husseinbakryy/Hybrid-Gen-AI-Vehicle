@@ -23,6 +23,13 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    # Ensure consistent layout across different Windows DPI settings.
+    # PassThrough lets Qt use the exact DPI scale factor (e.g. 1.25x, 1.5x)
+    # instead of rounding it, which prevents widgets from appearing too large
+    # or too small on screens with non-standard DPI relative to the dev machine.
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
     app = QApplication(sys.argv)
     app.setStyleSheet(DARK_STYLE)
 

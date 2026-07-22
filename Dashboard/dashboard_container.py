@@ -45,8 +45,8 @@ class DashboardContainer(QWidget):
 
         outer.addWidget(self.panel)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
+    def resizeEvent(self, a0):
+        super().resizeEvent(a0)
         available_w = self.width() * 0.94
         available_h = self.height() * 0.94
 

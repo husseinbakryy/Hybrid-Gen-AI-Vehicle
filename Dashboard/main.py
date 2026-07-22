@@ -24,12 +24,6 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    # Force Qt's own cross-platform Fusion style so widget rendering
-    # (especially text color in QComboBox, QLineEdit, QDoubleSpinBox) is
-    # consistent across all machines regardless of their OS theme. Without
-    # this, "windowsvista" or other native styles may ignore stylesheet
-    # color rules and pull text colors from the system palette instead.
-    app.setStyle("Fusion")
     app.setStyleSheet(DARK_STYLE)
 
     window = MainWindow()

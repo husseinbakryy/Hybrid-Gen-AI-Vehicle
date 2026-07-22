@@ -1,4 +1,5 @@
 import sys
+import threading
 import uvicorn
 from pathlib import Path
 from typing import Any, Optional
@@ -17,6 +18,7 @@ if str(MODELS_DIR) not in sys.path:
 
 from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_vehicles, insert_vehicle
 from pipeline.inference import predict_trip_structured
+from play_audio import generate_tts_audio, play_audio_file
 from recommender import run_recommender_agent
 
 
@@ -162,7 +164,6 @@ def add_vehicle(payload: AddVehicleRequest):
 def trip_recommendation_endpoint(payload: TripRecommendationRequest):
     try:
         trip_input = payload.trip_input
-      
         user_context = payload.user_context or {}
 
         make = trip_input.get("make")
@@ -241,6 +242,21 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             user_context=user_context,
         )
 
+        # 5. Generate TTS audio from the recommendation summary (non-blocking)
+        audio_base64: Optional[str] = None
+        summary_text = ""
+        if isinstance(agent_recommendation, dict):
+            summary_text = agent_recommendation.get("summary", "")
+        if summary_text:
+            try:
+                audio_base64, audio_path = generate_tts_audio(summary_text)
+                # Auto-play in background thread so we don't block the response
+                if audio_path:
+                    threading.Thread(target=play_audio_file, args=(audio_path,), daemon=True).start()
+            except Exception as audio_exc:
+                print(f"[TTS] Audio generation failed (non-fatal): {audio_exc}")
+                audio_base64 = None
+
         return {
             "status": "success",
             "vehicle": vehicle_doc,
@@ -248,6 +264,7 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             "user_context": user_context,
             "pipeline_predictions": ml_results,
             "agent_recommendation": agent_recommendation,
+            "audio_base64": audio_base64,
         }
     except HTTPException:
         raise

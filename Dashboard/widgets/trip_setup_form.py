@@ -276,25 +276,19 @@ class TripSetupForm(Card):
         self.pax_label.setText(f"{count} passenger" + ("" if count == 1 else "s"))
 
     def get_ev_range(self) -> int:
-        # Use the nominal per-vehicle EV ranges defined in VEHICLE_CATALOG or
-        # fallback to NOMINAL_EV_RANGE_KM defined centrally in trip_logic
-        # so the UI's time/range math has consistent inputs.
+        # Use the nominal per-vehicle EV ranges defined centrally in trip_logic
+        # so the UI's time/range math has consistent inputs even when the
+        # backend catalog doesn't include an ev_range field.
         try:
             import trip_logic
             sel = self.get_selected_vehicle()
             if not sel:
                 return 0
-
-            entry = trip_logic.VEHICLE_CATALOG.get(sel)
-            if isinstance(entry, dict) and entry.get("ev_range_km") is not None:
-                return int(round(float(entry["ev_range_km"])))
-
             val = trip_logic.NOMINAL_EV_RANGE_KM.get(sel)
-            if val is not None:
-                return val
-
-            print(f"[trip_setup_form] Warning: no nominal EV range for '{sel}', defaulting to 0 km")
-            return 0
+            if val is None:
+                print(f"[trip_setup_form] Warning: no nominal EV range for '{sel}', defaulting to 0 km")
+                return 0
+            return val
         except Exception:
             # Defensive: never return None to caller
             return 0

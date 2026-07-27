@@ -46,4 +46,4 @@ class DashboardContainer(QWidget):
         super().resizeEvent(a0)
         w = max(self.width() - 24, Dashboard.MIN_WIDTH)
         h = max(self.height() - 24, Dashboard.MIN_HEIGHT)
-        self.panel.setFixedSize(int(w), int(h))
+        self.panel.setFixedSize(w, h)

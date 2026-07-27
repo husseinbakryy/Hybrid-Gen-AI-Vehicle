@@ -143,6 +143,11 @@ class DashboardView(QWidget):
             lambda: self.sidebar_stack.setCurrentWidget(self.trip_form)
         )
 
+        # Header live controls signal wiring
+        self.header.stopClicked.connect(self._reset_trip)
+        self.header.muteToggled.connect(lambda muted: print(f"[header] mute: {muted}"))
+        self.header.multiplierChanged.connect(lambda mult: print(f"[header] multiplier: {mult}x"))
+
         # Temporary placeholders that will be replaced by real WebSocket calls in a later step
         self.live_controls.accelerateStarted.connect(lambda: print("[live] accelerate: start"))
         self.live_controls.accelerateStopped.connect(lambda: print("[live] accelerate: stop"))
@@ -209,6 +214,7 @@ class DashboardView(QWidget):
     TRIP_ANIMATION_DURATION_MS = 15000
 
     def _start_trip(self):
+        self.header.show_live_controls()
         # Build the payload dict using current live form values. This uses
         # trip_logic.build_trip_payload which will validate the selected
         # vehicle against the live VEHICLE_CATALOG. Any validation error is
@@ -300,6 +306,8 @@ class DashboardView(QWidget):
 
     def _reset_trip(self):
         self.trip_timer.stop()
+        self.header.hide_live_controls()
+        self.sidebar_stack.setCurrentWidget(self.trip_form)
         self.progress_panel.reset_display()
         self.stat_cards.reset_stats()
         self.recommendation.reset_text()

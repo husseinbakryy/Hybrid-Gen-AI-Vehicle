@@ -13,23 +13,23 @@ load_dotenv(_THIS_DIR / ".env")
 
 
 def play_audio_file(audio_path: str | Path) -> Path:
-    """Play an audio file headlessly at 1.4x speed."""
+    """Play an audio file headlessly at 1.7x speed."""
     output_path = Path(audio_path).resolve()
     if not output_path.exists():
         raise FileNotFoundError(f"Audio file not found: {output_path}")
 
     if sys.platform.startswith("win"):
-        # MediaPlayer with SpeedRatio set to 1.4
+        # MediaPlayer with SpeedRatio set to 1.7
         ps_script = (
             f"Add-Type -AssemblyName presentationCore; "
             f"$player = New-Object System.Windows.Media.MediaPlayer; "
             f"$player.Open([Uri]'{output_path}'); "
             f"Start-Sleep -Milliseconds 100; "
-            f"$player.SpeedRatio = 1.4; "
+            f"$player.SpeedRatio = 1.7; "
             f"$player.Play(); "
             f"Start-Sleep -Milliseconds 200; "
             f"while ($player.NaturalDuration.HasTimeSpan -eq $false) {{ Start-Sleep -Milliseconds 100 }}; "
-            f"$duration = $player.NaturalDuration.TimeSpan.TotalSeconds / 1.4; "
+            f"$duration = $player.NaturalDuration.TimeSpan.TotalSeconds / 1.7; "
             f"Start-Sleep -Seconds ([math]::Ceiling($duration)); "
             f"$player.Close()"
         )
@@ -44,9 +44,9 @@ def play_audio_file(audio_path: str | Path) -> Path:
         return output_path
 
     if sys.platform == "darwin":
-        subprocess.run(["afplay", "-r", "1.4", str(output_path)], check=False)
+        subprocess.run(["afplay", "-r", "1.7", str(output_path)], check=False)
     else:
-        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-af", "atempo=1.4", str(output_path)], check=False)
+        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-af", "atempo=1.7", str(output_path)], check=False)
 
     return output_path
 
@@ -102,7 +102,7 @@ def generate_tts_audio(
             "input": text,
             "voice": voice,
             "response_format": "mp3",
-            "speed": 1.4,  # Set API speed parameter to 1.4
+            "speed": 1.7,  # Set API speed parameter to 1.7
         }
 
         req = request.Request(

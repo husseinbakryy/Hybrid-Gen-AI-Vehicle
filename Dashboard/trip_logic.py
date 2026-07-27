@@ -315,7 +315,7 @@ def build_trip_payload(
     road_type: str = "urban",
     traffic: str = "Medium",
     distance: float = 10.0,
-    speed: float = 45.0,
+    speed: float = 0.0,
     passengers: int = 1,
     cargo: float = 0.0,
     style: str = "Normal",

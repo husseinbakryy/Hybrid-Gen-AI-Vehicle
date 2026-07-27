@@ -10,6 +10,7 @@ from widgets import (
 from widgets.card import Card
 from theme import Colors
 import trip_logic
+from live_trip_worker import LiveTripWorker
 
 
 class DashboardView(QWidget):
@@ -20,6 +21,11 @@ class DashboardView(QWidget):
 
     def __init__(self):
         super().__init__()
+        self._live_worker: LiveTripWorker | None = None
+        self._run_dist: float = 0.0
+        self._run_speed: float = 0.0
+        self._run_stops: list = []
+        self._run_segments: list = []
 
         outer = QGridLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -126,11 +132,10 @@ class DashboardView(QWidget):
         outer.setRowStretch(2, 2)
 
         # Connect form updates
-        self.trip_form.speedChanged.connect(self.speedometer.setSpeed)
         self.trip_form.distanceChanged.connect(
             lambda v: self.progress_panel.dist_label.setText(f"{v} km")
         )
-        self.speedometer.setSpeed(self.trip_form.get_speed())
+        self.speedometer.setSpeed(0)
 
         self.progress_panel.startClicked.connect(self._start_trip)
         self.progress_panel.resetClicked.connect(self._reset_trip)
@@ -144,15 +149,27 @@ class DashboardView(QWidget):
         )
 
         # Header live controls signal wiring
-        self.header.stopClicked.connect(self._reset_trip)
-        self.header.muteToggled.connect(lambda muted: print(f"[header] mute: {muted}"))
-        self.header.multiplierChanged.connect(lambda mult: print(f"[header] multiplier: {mult}x"))
+        self.header.stopClicked.connect(self._on_stop_clicked)
+        self.header.muteToggled.connect(
+            lambda enabled: self._live_worker.send_voice_toggle(enabled) if self._live_worker else None
+        )
+        self.header.multiplierChanged.connect(
+            lambda mult: self._live_worker.send_multiplier(mult) if self._live_worker else None
+        )
 
-        # Temporary placeholders that will be replaced by real WebSocket calls in a later step
-        self.live_controls.accelerateStarted.connect(lambda: print("[live] accelerate: start"))
-        self.live_controls.accelerateStopped.connect(lambda: print("[live] accelerate: stop"))
-        self.live_controls.brakeStarted.connect(lambda: print("[live] brake: start"))
-        self.live_controls.brakeStopped.connect(lambda: print("[live] brake: stop"))
+        # Wire pedal signals to live worker
+        self.live_controls.accelerateStarted.connect(
+            lambda: self._live_worker.send_action("accelerate") if self._live_worker else None
+        )
+        self.live_controls.accelerateStopped.connect(
+            lambda: self._live_worker.send_action("coast") if self._live_worker else None
+        )
+        self.live_controls.brakeStarted.connect(
+            lambda: self._live_worker.send_action("brake") if self._live_worker else None
+        )
+        self.live_controls.brakeStopped.connect(
+            lambda: self._live_worker.send_action("coast") if self._live_worker else None
+        )
 
         # Drives the local "simulating trip..." animation loop while a real
         # recommendation request is in flight - see _start_trip/_tick_trip.
@@ -200,11 +217,14 @@ class DashboardView(QWidget):
         self._update_start_enabled()
 
     def _update_start_enabled(self):
-        """Enable or disable the Start button based on recent health checks
-        and whether a vehicle is selected. This method must NOT modify layout
-        or reparent widgets — it only toggles interactivity."""
+        """Enable or disable the Start button based on recent health checks,
+        whether a vehicle is selected, and whether a live trip is active.
+        This method must NOT modify layout or reparent widgets — it only toggles interactivity."""
         has_vehicle = bool(self.trip_form.get_selected_vehicle())
-        self.progress_panel.start_btn.setEnabled(self._health_ok and has_vehicle)
+        is_live_active = self._live_worker is not None and self._live_worker.isRunning()
+        self.progress_panel.start_btn.setEnabled(
+            self._health_ok and has_vehicle and not is_live_active
+        )
 
     # The local trip-bar animation runs a single pass of ~150 ticks at
     # 100ms each (see _tick_trip: progress += 0.6667 per tick until it
@@ -215,10 +235,6 @@ class DashboardView(QWidget):
 
     def _start_trip(self):
         self.header.show_live_controls()
-        # Build the payload dict using current live form values. This uses
-        # trip_logic.build_trip_payload which will validate the selected
-        # vehicle against the live VEHICLE_CATALOG. Any validation error is
-        # surfaced inline rather than crashing the app.
         try:
             payload = trip_logic.build_trip_payload(
                 vehicle=self.trip_form.get_selected_vehicle(),
@@ -230,13 +246,11 @@ class DashboardView(QWidget):
                 road_type=self.trip_form.get_road_type(),
                 traffic=self.trip_form.get_traffic(),
                 distance=self.trip_form.get_distance(),
-                speed=self.trip_form.get_speed(),
                 passengers=self.trip_form.get_passengers(),
                 cargo=self.trip_form.get_cargo_kg(),
                 style=self.trip_form.get_style(),
             )
         except Exception as exc:
-            # Show error inline and abort start
             self.recommendation.set_text(f"Error building payload: {exc}")
             return
 
@@ -245,73 +259,166 @@ class DashboardView(QWidget):
         print(json.dumps(payload, indent=2))
         print("===================================\n")
 
-        # Compute local segments - used to drive the "simulating trip..."
-        # animation once the real response arrives (see
-        # _on_recommendation_result), not while we're waiting on it.
-        self._run_dist = self.trip_form.get_distance()
-        self._run_speed = self.trip_form.get_speed()
-        ev_range = self.trip_form.get_ev_range()
-        pax = self.trip_form.get_passengers()
-        load_factor = 1 + 0.02 * (pax - 1)
-        self._run_stops = []
+        # Stop existing worker defensively if running
+        if self._live_worker is not None and self._live_worker.isRunning():
+            self._live_worker.stop()
+            self._live_worker = None
 
-        # NOTE: self._run_segments is used ONLY by the describe_segments()
-        # fallback text path in _on_recommendation_result() (when the AI
-        # response arrives with no summary). It is NOT used by the animation
-        # anymore - the animation now reads self._animation_segments, which is
-        # built from the real backend recommended_mode via
-        # mode_to_animation_segments(). Both sources live side by side
-        # intentionally; do not merge them.
-        self._run_segments = trip_logic.compute_mode_segments(
-            self._run_dist,
-            ev_range / load_factor if load_factor else 0,
-            self._run_stops,
-            self.trip_form.get_temperature(),
-            self.trip_form.get_traffic(),
-            self.trip_form.get_style(),
-        )
+        self.live_controls.set_pedals_enabled(True)
+        self._live_worker = LiveTripWorker(payload)
+        self._live_worker.updateReceived.connect(self._on_live_update)
+        self._live_worker.connectionFailed.connect(self._on_live_connection_failed)
+        self._live_worker.connectionClosed.connect(self._on_live_connection_closed)
+        self._live_worker.start()
 
-        # Show a loading state in the recommendation panel while we fetch the
-        # backend recommendation. Deliberately do NOT reset_stats() here - the
-        # stat tiles keep showing the previous trip's numbers until the new
-        # response arrives, so animate_extended_stats() counts smoothly from
-        # those values instead of restarting from zero on every trip.
-        self.recommendation.set_text("Getting recommendation...")
-        self.progress_panel.start_btn.setEnabled(False)
+        self._update_start_enabled()
 
-        # Background worker to post the payload and fetch recommendation
-        class RecommendationWorker(QThread):
-            finished = pyqtSignal(bool, object)
+    def _on_live_update(self, update):
+        msg_type = update.message_type
 
-            def __init__(self, payload):
-                super().__init__()
-                self.payload = payload
+        if msg_type == "tick" and update.state:
+            state = update.state
+            speed = float(state.get("current_speed_kmh", 0.0))
+            self.speedometer.setSpeed(speed)
 
-            def run(self_inner):
-                try:
-                    r = requests.post(
-                        "http://localhost:8000/api/trip/recommendation",
-                        json=self_inner.payload,
-                        timeout=30,
+            soc = float(state.get("battery_soc_pct", 100.0))
+            fuel = float(state.get("fuel_level_pct", 100.0))
+            self.progress_panel.set_battery(soc)
+            self.progress_panel.set_fuel(fuel)
+
+            dist_km = float(state.get("distance_traveled_km", 0.0))
+            self.progress_panel.mile_label.setText(f"{dist_km:.1f} km")
+
+            mode = state.get("current_mode")
+            if mode:
+                mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Hybrid"}
+                self.progress_panel.set_mode(mode_map.get(str(mode).lower(), "Ready"))
+
+        elif msg_type == "ml_update" and update.predictions:
+            predictions = update.predictions
+            raw = predictions.get("raw") if isinstance(predictions, dict) else predictions
+            if isinstance(raw, dict):
+                cost = float(raw.get("trip_cost_usd", raw.get("cost", 0.0)))
+                trip_time_min = float(raw.get("trip_time_min", 0.0))
+                co2 = float(raw.get("co2_emissions_kg", raw.get("co2", 0.0)))
+                range_left = float(raw.get("range_left_km", 0.0))
+                fuel_l = float(raw.get("fuel_used_l", 0.0))
+                battery_kwh = float(raw.get("battery_used_kwh", 0.0))
+
+                # Used 1000ms duration for live updates so counters update smoothly without overlapping
+                self.stat_cards.animate_extended_stats(
+                    cost, trip_time_min, co2, range_left, fuel_l, battery_kwh, duration=1000
+                )
+
+        elif msg_type == "genai_update" and update.recommendation:
+            rec = update.recommendation
+            if isinstance(rec, dict):
+                summary = rec.get("summary", "")
+                actions = rec.get("actions", [])
+                if summary:
+                    text = summary
+                    if isinstance(actions, list) and len(actions) > 0:
+                        text += "\n\nActions:\n" + "\n".join(f"• {a}" for a in actions[:6])
+                    self.recommendation.set_text(text)
+
+        elif msg_type == "mode_switch" and update.mode_switch:
+            mode_data = update.mode_switch
+            to_mode = mode_data.get("to") or mode_data.get("to_mode", "")
+            mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Hybrid"}
+            if to_mode:
+                self.progress_panel.set_mode(mode_map.get(str(to_mode).lower(), "Ready"))
+
+        elif msg_type == "regen_event" and update.regen_event:
+            regen = update.regen_event
+            energy = regen.get("energy_recovered_kwh", 0.0)
+            print(f"[live] regen: {energy:.3f} kWh recovered")
+
+        elif msg_type == "voice_event" and update.voice_event:
+            voice = update.voice_event
+            text = voice.get("text", "")
+            if text:
+                self.progress_panel.next_event_label.setText(text)
+
+        elif msg_type == "trip_end" and update.trip_end:
+            trip_end = update.trip_end
+            final_state = trip_end.get("final_state")
+            if final_state and isinstance(final_state, dict):
+                speed = float(final_state.get("current_speed_kmh", 0.0))
+                self.speedometer.setSpeed(speed)
+                soc = float(final_state.get("battery_soc_pct", 100.0))
+                fuel = float(final_state.get("fuel_level_pct", 100.0))
+                self.progress_panel.set_battery(soc)
+                self.progress_panel.set_fuel(fuel)
+                dist_km = float(final_state.get("distance_traveled_km", 0.0))
+                self.progress_panel.mile_label.setText(f"{dist_km:.1f} km")
+
+            ml_preds = trip_end.get("ml_predictions")
+            if ml_preds:
+                raw = ml_preds.get("raw") if isinstance(ml_preds, dict) else ml_preds
+                if isinstance(raw, dict):
+                    cost = float(raw.get("trip_cost_usd", raw.get("cost", 0.0)))
+                    trip_time_min = float(raw.get("trip_time_min", 0.0))
+                    co2 = float(raw.get("co2_emissions_kg", raw.get("co2", 0.0)))
+                    range_left = float(raw.get("range_left_km", 0.0))
+                    fuel_l = float(raw.get("fuel_used_l", 0.0))
+                    battery_kwh = float(raw.get("battery_used_kwh", 0.0))
+                    self.stat_cards.animate_extended_stats(
+                        cost, trip_time_min, co2, range_left, fuel_l, battery_kwh, duration=1000
                     )
-                    r.raise_for_status()
-                    data = r.json()
-                    self_inner.finished.emit(True, data)
-                except Exception as exc:
-                    self_inner.finished.emit(False, str(exc))
 
-        self._rec_thread = RecommendationWorker(payload)
-        self._rec_thread.finished.connect(self._on_recommendation_result)
-        self._rec_thread.start()
+            genai_rec = trip_end.get("genai_recommendation")
+            if genai_rec and isinstance(genai_rec, dict):
+                summary = genai_rec.get("summary", "")
+                actions = genai_rec.get("actions", [])
+                if summary:
+                    text = summary
+                    if isinstance(actions, list) and len(actions) > 0:
+                        text += "\n\nActions:\n" + "\n".join(f"• {a}" for a in actions[:6])
+                    self.recommendation.set_text(text)
+
+            self.live_controls.set_pedals_enabled(False)
+
+        elif msg_type == "error" and update.error:
+            self._on_live_connection_failed(update.error)
+
+    def _on_live_connection_failed(self, error_msg: str):
+        print(f"[live error] {error_msg}")
+        self.recommendation.set_text(f"Connection failed: {error_msg}")
+        if self._live_worker is not None:
+            self._live_worker = None
+        self._update_start_enabled()
+
+    def _on_live_connection_closed(self):
+        # Per product decision, ending a live trip (whether by Stop, natural
+        # trip_end, or connection error) freezes the display exactly where
+        # it is - only pressing Reset returns to Trip Setup. This is
+        # intentional, not a bug.
+        self.live_controls.set_pedals_enabled(False)
+        self._update_start_enabled()
+
+    def _on_stop_clicked(self):
+        # Explicit requirement: stopping a live trip freezes the trip in place and
+        # disables pedals. It does NOT swap the sidebar back, hide header cluster,
+        # or touch any displayed stat values. Only Reset resets the UI.
+        if self._live_worker is not None:
+            self._live_worker.stop()
+        self.live_controls.set_pedals_enabled(False)
 
     def _reset_trip(self):
+        if self._live_worker is not None:
+            if self._live_worker.isRunning():
+                self._live_worker.stop()
+            self._live_worker = None
+        self.live_controls.set_pedals_enabled(True)
+
         self.trip_timer.stop()
         self.header.hide_live_controls()
         self.sidebar_stack.setCurrentWidget(self.trip_form)
         self.progress_panel.reset_display()
         self.stat_cards.reset_stats()
         self.recommendation.reset_text()
-        self.speedometer.setSpeed(self.trip_form.get_speed())
+        self.speedometer.setSpeed(0)
+        self._update_start_enabled()
 
     def _on_recommendation_result(self, success: bool, data: object):
         # This runs in the main thread via the QThread signal connection.

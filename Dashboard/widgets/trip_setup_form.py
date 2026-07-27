@@ -17,7 +17,6 @@ from theme import Colors
 
 
 class TripSetupForm(Card):
-    speedChanged = pyqtSignal(int)
     distanceChanged = pyqtSignal(int)
 
     def __init__(self, parent=None):
@@ -96,12 +95,6 @@ class TripSetupForm(Card):
         self.distance_spin.setValue(65)
         self.add_widget(self.distance_spin)
 
-        self.speed_value_label = self._label("Avg speed: 45 km/h")
-        self.add_widget(self.speed_value_label)
-        self.speed_slider = QSlider(Qt.Orientation.Horizontal)
-        self.speed_slider.setRange(1, 120)
-        self.speed_slider.setValue(45)
-        self.add_widget(self.speed_slider)
 
         self.temp_value_label = self._label("Temperature: 20C")
         self.add_widget(self.temp_value_label)
@@ -181,7 +174,6 @@ class TripSetupForm(Card):
 
         self.add_stretch()
 
-        self.speed_slider.valueChanged.connect(self._on_speed_changed)
         self.distance_spin.valueChanged.connect(self._on_distance_changed)
         self.temp_slider.valueChanged.connect(
             lambda v: self.temp_value_label.setText(f"Temperature: {v}C")
@@ -266,10 +258,6 @@ class TripSetupForm(Card):
             f'Vehicle (<span style="color:{Colors.TEXT.name()}; font-weight:700;">{vehicle_type}</span>)'
         )
 
-    def _on_speed_changed(self, value: int):
-        self.speed_value_label.setText(f"Avg speed: {value} km/h")
-        self.speedChanged.emit(value)
-
     def _on_distance_changed(self, value: int):
         self.distanceChanged.emit(value)
 
@@ -298,9 +286,6 @@ class TripSetupForm(Card):
 
     def get_distance(self) -> int:
         return self.distance_spin.value()
-
-    def get_speed(self) -> int:
-        return self.speed_slider.value()
 
     def get_passengers(self) -> int:
         return self.seat_selector.passenger_count()

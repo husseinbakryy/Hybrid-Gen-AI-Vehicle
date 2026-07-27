@@ -206,3 +206,8 @@ class LiveControlsPanel(Card):
         self.gas_btn.released.connect(self.accelerateStopped.emit)
         self.brake_btn.pressed.connect(self.brakeStarted.emit)
         self.brake_btn.released.connect(self.brakeStopped.emit)
+
+    def set_pedals_enabled(self, enabled: bool):
+        self.gas_btn.setEnabled(enabled)
+        self.brake_btn.setEnabled(enabled)
+

@@ -89,6 +89,7 @@ def _async_generate_and_play_tts(text: str):
         print(f"[TTS] Background audio generation/playback failed: {audio_exc}")
 
 
+# pyrefly: ignore [deprecated]
 @app.on_event("startup")
 def prewarm_assets():
     try:

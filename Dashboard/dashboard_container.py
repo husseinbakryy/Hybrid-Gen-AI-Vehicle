@@ -18,15 +18,12 @@ from main_window import DashboardView
 
 
 class DashboardContainer(QWidget):
-    ASPECT_RATIO = Dashboard.WIDTH / Dashboard.HEIGHT
-
     def __init__(self):
         super().__init__()
         self.setStyleSheet(f"background-color: {Colors.BACKGROUND.name()};")
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        outer.setContentsMargins(12, 12, 12, 12)
 
         # QFrame (not QWidget) so the QFrame#Dashboard stylesheet rule
         # from styles.py applies (background, border, radius) - plain QSS
@@ -47,16 +44,6 @@ class DashboardContainer(QWidget):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        available_w = self.width() * 0.94
-        available_h = self.height() * 0.94
-
-        w = min(available_w, Dashboard.WIDTH)
-        h = w / self.ASPECT_RATIO
-        if h > available_h:
-            h = available_h
-            w = h * self.ASPECT_RATIO
-
-        w = max(w, Dashboard.MIN_WIDTH)
-        h = max(h, Dashboard.MIN_HEIGHT)
-
+        w = max(self.width() - 24, Dashboard.MIN_WIDTH)
+        h = max(self.height() - 24, Dashboard.MIN_HEIGHT)
         self.panel.setFixedSize(int(w), int(h))

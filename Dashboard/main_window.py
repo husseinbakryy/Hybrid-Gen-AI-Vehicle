@@ -1,11 +1,11 @@
 import random
-from PyQt6.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QFrame
+from PyQt6.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QFrame, QStackedWidget
 from PyQt6.QtCore import QTimer, QThread, pyqtSignal, QObject
 import requests
 
 from widgets import (
     Speedometer, TripProgressPanel, TripSetupForm, StatCardsPanel, RecommendationPanel,
-    Header
+    Header, LiveControlsPanel
 )
 from widgets.card import Card
 from theme import Colors
@@ -108,9 +108,18 @@ class DashboardView(QWidget):
         outer.addWidget(self.header, 0, 0, 1, 2)
         # Left column (merged card + stacked panels) - fixed layout, no scroll area
         outer.addWidget(left_widget, 1, 0, 2, 1)
-        # Trip Setup spans both rows on the right - a persistent sidebar
-        # while the merged left column stacks up on the left
-        outer.addWidget(self.trip_form, 1, 1, 2, 1)
+        # Right sidebar: stacked widget that swaps between Trip Setup
+        # and Live Controls. Default to showing the Trip Setup form.
+        self.live_controls = LiveControlsPanel()
+        self.sidebar_stack = QStackedWidget()
+        self.sidebar_stack.addWidget(self.trip_form)
+        self.sidebar_stack.addWidget(self.live_controls)
+        self.sidebar_stack.setCurrentWidget(self.trip_form)
+        outer.addWidget(self.sidebar_stack, 1, 1, 2, 1)
+
+        # Give left column and right sidebar appropriate stretch proportions
+        outer.setColumnStretch(0, 3)
+        outer.setColumnStretch(1, 1)
 
         # Give the speedometer row more room than the bottom group row
         outer.setRowStretch(1, 1)
@@ -125,6 +134,20 @@ class DashboardView(QWidget):
 
         self.progress_panel.startClicked.connect(self._start_trip)
         self.progress_panel.resetClicked.connect(self._reset_trip)
+
+        # Swap right sidebar between Trip Setup and Live Controls on start/reset
+        self.progress_panel.startClicked.connect(
+            lambda: self.sidebar_stack.setCurrentWidget(self.live_controls)
+        )
+        self.progress_panel.resetClicked.connect(
+            lambda: self.sidebar_stack.setCurrentWidget(self.trip_form)
+        )
+
+        # Temporary placeholders that will be replaced by real WebSocket calls in a later step
+        self.live_controls.accelerateStarted.connect(lambda: print("[live] accelerate: start"))
+        self.live_controls.accelerateStopped.connect(lambda: print("[live] accelerate: stop"))
+        self.live_controls.brakeStarted.connect(lambda: print("[live] brake: start"))
+        self.live_controls.brakeStopped.connect(lambda: print("[live] brake: stop"))
 
         # Drives the local "simulating trip..." animation loop while a real
         # recommendation request is in flight - see _start_trip/_tick_trip.

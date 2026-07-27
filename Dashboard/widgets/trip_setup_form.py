@@ -22,7 +22,7 @@ class TripSetupForm(Card):
 
     def __init__(self, parent=None):
         super().__init__("Trip Setup", Colors.RANGE)
-        self.setFixedWidth(260)
+        self.setMinimumWidth(280)
         self._ev_range_warned: set[str] = set()
 
         self.scroll_area = QScrollArea()

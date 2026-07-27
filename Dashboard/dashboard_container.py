@@ -11,7 +11,7 @@ the specific thing misbehaving here).
 """
 
 from PyQt6.QtWidgets import QWidget, QFrame, QVBoxLayout
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 
 from theme import Dashboard, Colors
 from main_window import DashboardView
@@ -45,31 +45,8 @@ class DashboardContainer(QWidget):
 
         outer.addWidget(self.panel)
 
-        # After the window is shown, Qt may report transient/stale sizes while
-        # DPI scaling settles (especially when PassThrough rounding policy is
-        # in use). Schedule a delayed recompute of the panel size so the
-        # fixed size is corrected once the final geometry is available.
-        # This avoids intermittently locking in a wrong size on first show.
-        QTimer.singleShot(100, self._recompute_panel_size)
-
-    def showEvent(self, ev):
-        super().showEvent(ev)
-        # Also schedule an immediate zero-delay recompute after show to
-        # handle environments where the geometry is ready right after
-        # showEvent. The 100ms singleShot above is a safety net.
-        QTimer.singleShot(0, self._recompute_panel_size)
-
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        # Use the shared recompute routine so both resize and delayed
-        # recomputes use identical logic.
-        self._recompute_panel_size()
-
-    def _recompute_panel_size(self):
-        """Compute and apply the panel's fixed size based on the current
-        container geometry. Extracted from resizeEvent so it can be
-        invoked again after show to avoid transient/stale sizes.
-        """
         available_w = self.width() * 0.94
         available_h = self.height() * 0.94
 

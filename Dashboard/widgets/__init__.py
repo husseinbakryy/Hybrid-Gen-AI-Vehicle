@@ -10,7 +10,6 @@ from widgets.trip_setup_form import TripSetupForm
 from widgets.stat_cards_panel import StatCardsPanel
 from widgets.recommendation_panel import RecommendationPanel
 from widgets.header import Header
-from widgets.live_controls_panel import LiveControlsPanel
 
 __all__ = [
     "Speedometer",
@@ -21,5 +20,4 @@ __all__ = [
     "StatCardsPanel",
     "RecommendationPanel",
     "Header",
-    "LiveControlsPanel",
 ]

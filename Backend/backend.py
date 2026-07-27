@@ -1,3 +1,5 @@
+import asyncio
+import json
 import sys
 import threading
 import uvicorn
@@ -5,7 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +22,7 @@ from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_veh
 from pipeline.inference import predict_trip_structured
 from play_audio import generate_tts_audio, play_audio_file
 from recommender import run_recommender_agent
+from trip_simulation import TripSimulation, build_trip_start_announcement
 
 
 class VehicleSummaryItem(BaseModel):
@@ -72,8 +75,8 @@ class TripRecommendationRequest(BaseModel):
 
 app = FastAPI(
     title="Hybrid Vehicle Recommendation AI API",
-    version="1.7",
-    description="Integrates database specs, fast ML telemetry, and Agent AI recommendations.",
+    version="2.0",
+    description="Integrates database specs, fast ML telemetry, Agent AI recommendations, and real-time trip streaming via WebSocket.",
 )
 
 
@@ -266,6 +269,141 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# WebSocket endpoint for real-time trip streaming
+# ---------------------------------------------------------------------------
+
+@app.websocket("/ws/trip/live")
+async def websocket_trip_live(ws: WebSocket):
+    """Real-time trip simulation over WebSocket.
+
+    Protocol
+    --------
+    1. Client connects and sends initial trip config JSON (same shape as
+       ``TripRecommendationRequest``).
+    2. Server validates the config, creates a ``TripSimulation``, and begins
+       pushing tick events at ~1 second intervals.
+    3. Client sends control messages as JSON:
+       - ``{"action": "accelerate"}``
+       - ``{"action": "brake"}``
+       - ``{"action": "coast"}``
+       - ``{"action": "set_time_multiplier", "value": 10}``
+       - ``{"action": "toggle_voice", "enabled": false}``
+       - ``{"action": "stop"}``
+    4. Server pushes event JSON messages:
+       - ``{"type": "tick", "state": {...}}``
+       - ``{"type": "ml_update", ...}``
+       - ``{"type": "genai_update", ...}``
+       - ``{"type": "regen_event", ...}``
+       - ``{"type": "mode_switch", ...}``
+       - ``{"type": "voice_event", ...}``
+       - ``{"type": "trip_end", ...}``
+    """
+    await ws.accept()
+    print("[WS] Client connected to /ws/trip/live")
+
+    # ---- Step 1: Receive initial trip config --------------------------------
+    try:
+        raw_config = await asyncio.wait_for(ws.receive_text(), timeout=30.0)
+        config = json.loads(raw_config)
+    except asyncio.TimeoutError:
+        await ws.send_json({"type": "error", "detail": "Timeout waiting for trip config."})
+        await ws.close()
+        return
+    except Exception as exc:
+        await ws.send_json({"type": "error", "detail": f"Invalid config: {exc}"})
+        await ws.close()
+        return
+
+    # ---- Validate & fetch vehicle -------------------------------------------
+    trip_input = config.get("trip_input", {})
+    make = trip_input.get("make")
+    model = trip_input.get("model")
+
+    if not make or not model:
+        await ws.send_json({"type": "error", "detail": "Both 'make' and 'model' must be provided."})
+        await ws.close()
+        return
+
+    vehicle_doc = fetch_vehicle_by_make_model(make, model)
+    if not vehicle_doc:
+        await ws.send_json({"type": "error", "detail": f"Vehicle '{make} {model}' not found."})
+        await ws.close()
+        return
+
+    # ---- Create simulation --------------------------------------------------
+    sim = TripSimulation(
+        trip_config=config,
+        vehicle_doc=vehicle_doc,
+        ml_predict_fn=predict_trip_structured,
+        genai_fn=run_recommender_agent,
+        tts_fn=_async_generate_and_play_tts,
+    )
+
+    await ws.send_json({"type": "connected", "vehicle": vehicle_doc})
+    print(f"[WS] Trip simulation started: {make} {model}, {trip_input.get('distance_km', '?')} km")
+
+    # TTS trip start announcement
+    start_text = build_trip_start_announcement(vehicle_doc, trip_input)
+    await ws.send_json({"type": "voice_event", "event": "trip_start", "text": start_text})
+    threading.Thread(target=_async_generate_and_play_tts, args=(start_text,), daemon=True).start()
+
+    # ---- Step 2: Tick loop + listen for client messages ---------------------
+    async def _listen_for_client_messages():
+        """Non-blocking listener for client control messages."""
+        try:
+            while not sim.is_finished:
+                try:
+                    raw = await asyncio.wait_for(ws.receive_text(), timeout=0.1)
+                    msg = json.loads(raw)
+                    action = msg.get("action", "")
+
+                    if action in ("accelerate", "brake", "coast"):
+                        sim.set_action(action)
+                    elif action == "set_time_multiplier":
+                        sim.set_time_multiplier(int(msg.get("value", 1)))
+                    elif action == "toggle_voice":
+                        sim.set_voice_enabled(bool(msg.get("enabled", True)))
+                    elif action == "stop":
+                        events = sim.stop()
+                        for ev in events:
+                            await ws.send_json({"type": ev.event_type, **ev.data})
+                        return
+                except asyncio.TimeoutError:
+                    continue
+                except WebSocketDisconnect:
+                    return
+                except json.JSONDecodeError:
+                    continue
+        except WebSocketDisconnect:
+            return
+
+    # Run the listener as a background task
+    listener_task = asyncio.create_task(_listen_for_client_messages())
+
+    try:
+        while not sim.is_finished:
+            events = sim.tick(wall_dt_seconds=1.0)
+            for ev in events:
+                await ws.send_json({"type": ev.event_type, **ev.data})
+            await asyncio.sleep(1.0)
+    except WebSocketDisconnect:
+        print("[WS] Client disconnected.")
+    except Exception as exc:
+        print(f"[WS] Error in tick loop: {exc}")
+        try:
+            await ws.send_json({"type": "error", "detail": str(exc)})
+        except Exception:
+            pass
+    finally:
+        listener_task.cancel()
+        try:
+            await listener_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        print("[WS] Trip session ended.")
 
 
 if __name__ == "__main__":

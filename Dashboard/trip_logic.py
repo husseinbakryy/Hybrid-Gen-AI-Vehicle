@@ -359,3 +359,170 @@ def build_trip_payload(
 
 def build_trip_payload_json(**kwargs) -> str:
     return json.dumps(build_trip_payload(**kwargs), indent=2)
+
+
+# ---------------------------------------------------------------------------
+# WebSocket client helpers for real-time trip streaming
+# ---------------------------------------------------------------------------
+# These functions provide a simple API for the dashboard (PyQt) to interact
+# with the backend's /ws/trip/live WebSocket endpoint.  They use the
+# ``websocket-client`` library (synchronous WebSocket) which works well
+# with PyQt's threaded model (QThread).
+#
+# Usage pattern for the dashboard team:
+#   1. Call ``connect_live_trip(config)`` → returns a WebSocket connection
+#   2. In a QThread loop, call ``ws.recv()`` and pass to ``parse_server_message()``
+#   3. Use ``send_pedal_action(ws, "accelerate")`` etc. on user input
+#   4. Call ``stop_live_trip(ws)`` when user clicks Stop
+
+try:
+    import websocket as _ws_lib  # websocket-client library
+except ImportError:
+    _ws_lib = None
+
+import dataclasses
+
+
+@dataclasses.dataclass
+class TripUpdate:
+    """Parsed server message from the live trip WebSocket."""
+    message_type: str           # "tick", "ml_update", "genai_update", etc.
+    state: dict | None = None   # Full trip state (for "tick" messages)
+    predictions: dict | None = None
+    recommendation: dict | None = None
+    regen_event: dict | None = None
+    mode_switch: dict | None = None
+    voice_event: dict | None = None
+    trip_end: dict | None = None
+    error: str | None = None
+    raw: dict | None = None     # Full raw message for custom handling
+
+
+def connect_live_trip(
+    config: dict,
+    base_url: str = "ws://localhost:8000",
+    timeout: float = 30.0,
+) -> object | None:
+    """Open a WebSocket connection to /ws/trip/live and send the initial config.
+
+    Parameters
+    ----------
+    config : dict
+        Trip configuration (same shape as ``build_trip_payload()`` output).
+    base_url : str
+        WebSocket URL base (default: ws://localhost:8000).
+    timeout : float
+        Connection timeout in seconds.
+
+    Returns
+    -------
+    WebSocket connection object, or None if websocket-client is not installed.
+    """
+    if _ws_lib is None:
+        print("[trip_logic] websocket-client library not available for live trip")
+        return None
+
+    url = f"{base_url.rstrip('/')}/ws/trip/live"
+    try:
+        ws = _ws_lib.create_connection(url, timeout=timeout)
+        # Send the initial trip config
+        ws.send(json.dumps(config))
+        return ws
+    except Exception as exc:
+        print(f"[trip_logic] Failed to connect to {url}: {exc}")
+        return None
+
+
+def send_pedal_action(ws: object, action: str) -> None:
+    """Send a pedal action (accelerate / brake / coast) to the server."""
+    if ws is None:
+        return
+    try:
+        ws.send(json.dumps({"action": action}))
+    except Exception:
+        pass
+
+
+def send_time_multiplier(ws: object, value: int) -> None:
+    """Change the simulation time multiplier (1x, 5x, 10x, 50x)."""
+    if ws is None:
+        return
+    try:
+        ws.send(json.dumps({"action": "set_time_multiplier", "value": value}))
+    except Exception:
+        pass
+
+
+def toggle_voice(ws: object, enabled: bool) -> None:
+    """Enable or disable TTS voice announcements."""
+    if ws is None:
+        return
+    try:
+        ws.send(json.dumps({"action": "toggle_voice", "enabled": enabled}))
+    except Exception:
+        pass
+
+
+def stop_live_trip(ws: object) -> None:
+    """Send a stop command and close the WebSocket."""
+    if ws is None:
+        return
+    try:
+        ws.send(json.dumps({"action": "stop"}))
+    except Exception:
+        pass
+    try:
+        ws.close()
+    except Exception:
+        pass
+
+
+def parse_server_message(raw_text: str) -> TripUpdate:
+    """Parse a raw JSON message from the server into a TripUpdate.
+
+    Parameters
+    ----------
+    raw_text : str
+        Raw JSON string received from the WebSocket.
+
+    Returns
+    -------
+    TripUpdate with the appropriate fields populated.
+    """
+    try:
+        msg = json.loads(raw_text)
+    except json.JSONDecodeError:
+        return TripUpdate(message_type="error", error="Invalid JSON")
+
+    msg_type = msg.get("type", "unknown")
+    update = TripUpdate(message_type=msg_type, raw=msg)
+
+    if msg_type == "tick":
+        update.state = msg.get("state")
+    elif msg_type == "ml_update":
+        update.predictions = msg.get("predictions")
+    elif msg_type == "genai_update":
+        update.recommendation = msg.get("recommendation")
+    elif msg_type == "regen_event":
+        update.regen_event = {
+            "energy_recovered_kwh": msg.get("energy_recovered_kwh", 0.0),
+            "total_regen_kwh": msg.get("total_regen_kwh", 0.0),
+            "new_soc_pct": msg.get("new_soc_pct", 0.0),
+        }
+    elif msg_type == "mode_switch":
+        update.mode_switch = {
+            "from": msg.get("from"),
+            "to": msg.get("to"),
+            "reason": msg.get("reason", ""),
+        }
+    elif msg_type == "voice_event":
+        update.voice_event = {
+            "event": msg.get("event"),
+            "text": msg.get("text", ""),
+        }
+    elif msg_type == "trip_end":
+        update.trip_end = msg
+    elif msg_type == "error":
+        update.error = msg.get("detail", "Unknown error")
+
+    return update

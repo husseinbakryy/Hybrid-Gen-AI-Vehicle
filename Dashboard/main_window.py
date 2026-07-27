@@ -1,6 +1,7 @@
 import random
+import time
 from PyQt6.QtWidgets import QWidget, QGridLayout, QVBoxLayout, QFrame, QStackedWidget
-from PyQt6.QtCore import QTimer, QThread, pyqtSignal, QObject
+from PyQt6.QtCore import QTimer, QThread, pyqtSignal, QObject, QEasingCurve
 import requests
 
 from widgets import (
@@ -22,6 +23,7 @@ class DashboardView(QWidget):
     def __init__(self):
         super().__init__()
         self._live_worker: LiveTripWorker | None = None
+        self._last_tick_wall_time: float | None = None
         self._run_dist: float = 0.0
         self._run_speed: float = 0.0
         self._run_stops: list = []
@@ -234,6 +236,7 @@ class DashboardView(QWidget):
     TRIP_ANIMATION_DURATION_MS = 15000
 
     def _start_trip(self):
+        self._last_tick_wall_time = None
         self.header.show_live_controls()
         try:
             payload = trip_logic.build_trip_payload(
@@ -279,7 +282,17 @@ class DashboardView(QWidget):
         if msg_type == "tick" and update.state:
             state = update.state
             speed = float(state.get("current_speed_kmh", 0.0))
-            self.speedometer.setSpeed(speed, duration=950)
+
+            now = time.monotonic()
+            if self._last_tick_wall_time is None:
+                gap_ms = 950
+            else:
+                gap_ms = (now - self._last_tick_wall_time) * 1000
+                gap_ms = max(300, min(3000, gap_ms))
+            self._last_tick_wall_time = now
+
+            self.speedometer.setSpeed(speed, duration=int(gap_ms),
+                                       easing=QEasingCurve.Type.Linear)
 
             soc = float(state.get("battery_soc_pct", 100.0))
             fuel = float(state.get("fuel_level_pct", 100.0))
@@ -405,6 +418,7 @@ class DashboardView(QWidget):
         self.live_controls.set_pedals_enabled(False)
 
     def _reset_trip(self):
+        self._last_tick_wall_time = None
         if self._live_worker is not None:
             if self._live_worker.isRunning():
                 self._live_worker.stop()

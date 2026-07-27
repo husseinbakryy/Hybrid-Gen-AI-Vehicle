@@ -31,6 +31,11 @@ MAX_ACCEL_MPS2 = 3.0        # comfortable gas-pedal acceleration
 MAX_DECEL_MPS2 = -5.0       # moderate braking deceleration
 COAST_DECEL_MPS2 = -0.3     # gentle drag deceleration when coasting
 
+# Gas pedal acceleration - intentionally a separate constant from
+# MAX_ACCEL_MPS2 (which also feeds the coast-branch clamp bound),
+# so tuning this can never affect coasting or braking behavior.
+GAS_PEDAL_ACCEL_MPS2 = 3.6   # ~20% brisker than the old 3.0 baseline
+
 # Speed bounds (km/h)
 MIN_SPEED_KMH = 0.0
 MAX_SPEED_KMH = 180.0
@@ -107,7 +112,7 @@ def compute_speed_change(
     if action == "accelerate":
         speed_factor = max(0.2, 1.0 - (current_speed_kmh / MAX_SPEED_KMH))
         traffic_penalty = 1.0 - 0.4 * traffic_level
-        accel = MAX_ACCEL_MPS2 * speed_factor * traffic_penalty
+        accel = GAS_PEDAL_ACCEL_MPS2 * speed_factor * traffic_penalty
     elif action == "brake":
         accel = MAX_DECEL_MPS2 * (0.6 + 0.4 * min(1.0, current_speed_kmh / 60.0))
     else:

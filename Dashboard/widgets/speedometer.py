@@ -31,12 +31,17 @@ class Speedometer(QWidget):
         self._display_speed = 0.0   # animated value actually drawn
         self._sweep_anim = None
 
-    def setSpeed(self, value: float, duration: int = Animation.FAST):
+    def setSpeed(self, value: float, duration: int = Animation.FAST,
+                  easing=None):
         target = max(SpeedometerTheme.MIN_SPEED, min(SpeedometerTheme.MAX_SPEED, value))
         self._speed = target
 
         if self._sweep_anim is not None:
             self._sweep_anim.stop()
+
+        kwargs = {}
+        if easing is not None:
+            kwargs["easing"] = easing
 
         self._sweep_anim = animate_value(
             self._set_display_speed,
@@ -44,6 +49,7 @@ class Speedometer(QWidget):
             target,
             duration=duration,
             parent=self,
+            **kwargs,
         )
 
     def _set_display_speed(self, value: float):

@@ -7,7 +7,6 @@ schedules ML / GenAI prediction cycles based on real wall-clock time.
 from __future__ import annotations
 
 import asyncio
-import time
 import threading
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
@@ -162,40 +161,45 @@ class TripSimulation:
         self._voice_enabled = enabled
 
     def tick(self, wall_dt_seconds: float = 1.0) -> list[SimEvent]:
-        """Advance the simulation by wall_dt_seconds."""
+        """Advance the simulation by wall_dt_seconds.
+
+        time_multiplier only scales the trip's PROGRESS (distance, energy,
+        elapsed simulated time) - it never changes how speed responds to
+        pedal input. Speed/acceleration are always computed with a fixed
+        1-second step, so pedal response and the speedometer behave
+        identically to x1 regardless of the selected multiplier.
+        """
         if self._finished:
             return []
 
         events: list[SimEvent] = []
-        sim_dt = wall_dt_seconds * self._time_multiplier
 
         old_speed = self.state.current_speed_kmh
         old_mode = self.state.current_mode
+
+        # Scales the trip's progress (distance/energy/elapsed time) with the multiplier.
+        progress_dt = wall_dt_seconds * self._time_multiplier
+        # Fixed regardless of multiplier: keeps pedal response/speedometer identical to x1.
+        SPEED_DT = 1.0
 
         new_speed, accel = compute_speed_change(
             self.state.current_speed_kmh,
             self._current_action,
             self.road_type,
             self.traffic_level,
-            sim_dt,
+            SPEED_DT,
         )
 
-        regen_kwh = 0.0
+        total_regen_kwh = 0.0
         if new_speed < old_speed and self._current_action == "brake":
-            regen_kwh = compute_regen_energy(
+            total_regen_kwh = compute_regen_energy(
                 old_speed, new_speed, self.vehicle,
                 self.passengers, self.cargo_kg,
             )
             if self.vehicle.usable_battery_kwh > 0:
-                regen_pct = (regen_kwh / self.vehicle.usable_battery_kwh) * 100.0
+                regen_pct = (total_regen_kwh / self.vehicle.usable_battery_kwh) * 100.0
                 self.state.battery_soc_pct = min(100.0, self.state.battery_soc_pct + regen_pct)
-            self.state.regen_energy_kwh += regen_kwh
-
-            events.append(SimEvent("regen_event", {
-                "energy_recovered_kwh": round(regen_kwh, 4),
-                "total_regen_kwh": round(self.state.regen_energy_kwh, 4),
-                "new_soc_pct": round(self.state.battery_soc_pct, 2),
-            }))
+            self.state.regen_energy_kwh += total_regen_kwh
 
         self.state.current_speed_kmh = new_speed
         self.state.current_acceleration_mps2 = accel
@@ -204,7 +208,7 @@ class TripSimulation:
 
         energy = compute_tick_energy(
             avg_speed, max(0, accel), self.vehicle,
-            self.state.current_mode, sim_dt,
+            old_mode, progress_dt,
             self.passengers, self.cargo_kg,
             self.ambient_temp_c, self.wind_speed_kmh,
         )
@@ -214,7 +218,7 @@ class TripSimulation:
         self.state.fuel_used_l += energy["fuel_used_l"]
         self.state.co2_emitted_kg += energy["co2_kg"]
         self.state.trip_cost_usd += energy["cost_usd"]
-        self.state.elapsed_sim_seconds += sim_dt
+        self.state.elapsed_sim_seconds += progress_dt
 
         if self.vehicle.usable_battery_kwh > 0:
             used_pct = (energy["battery_used_kwh"] / self.vehicle.usable_battery_kwh) * 100.0
@@ -226,6 +230,19 @@ class TripSimulation:
         if self.state.battery_soc_pct <= 0.0 and self.vehicle.powertrain_type != "ice":
             if self.state.current_mode != "ice" and self.vehicle.fuel_tank_l > 0:
                 self.state.current_mode = "ice"
+
+        if self.state.distance_traveled_km >= self.total_distance_km:
+            self.state.distance_traveled_km = self.total_distance_km
+            end_events = self._end_trip("Trip distance completed.")
+            events.extend(end_events)
+            return events
+
+        if total_regen_kwh > 0:
+            events.append(SimEvent("regen_event", {
+                "energy_recovered_kwh": round(total_regen_kwh, 4),
+                "total_regen_kwh": round(self.state.regen_energy_kwh, 4),
+                "new_soc_pct": round(self.state.battery_soc_pct, 2),
+            }))
 
         # --- ML prediction cycle (every 10 REAL WALL-CLOCK seconds) ---------------
         self._wall_seconds_since_ml += wall_dt_seconds
@@ -281,11 +298,6 @@ class TripSimulation:
                 self._fire_tts(warn_text)
         elif self.state.current_speed_kmh <= speed_limit * 0.9:
             self._speed_warned = False
-
-        if self.state.distance_traveled_km >= self.total_distance_km:
-            self.state.distance_traveled_km = self.total_distance_km
-            end_events = self._end_trip("Trip distance completed.")
-            events.extend(end_events)
 
         events.insert(0, SimEvent("tick", {"state": self.state.to_dict()}))
         return events

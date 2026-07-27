@@ -279,7 +279,7 @@ class DashboardView(QWidget):
         if msg_type == "tick" and update.state:
             state = update.state
             speed = float(state.get("current_speed_kmh", 0.0))
-            self.speedometer.setSpeed(speed)
+            self.speedometer.setSpeed(speed, duration=950)
 
             soc = float(state.get("battery_soc_pct", 100.0))
             fuel = float(state.get("fuel_level_pct", 100.0))
@@ -344,7 +344,7 @@ class DashboardView(QWidget):
             final_state = trip_end.get("final_state")
             if final_state and isinstance(final_state, dict):
                 speed = float(final_state.get("current_speed_kmh", 0.0))
-                self.speedometer.setSpeed(speed)
+                self.speedometer.setSpeed(speed, duration=950)
                 soc = float(final_state.get("battery_soc_pct", 100.0))
                 fuel = float(final_state.get("fuel_level_pct", 100.0))
                 self.progress_panel.set_battery(soc)

@@ -423,12 +423,37 @@ class DashboardView(QWidget):
             final_state = trip_end.get("final_state")
             if final_state and isinstance(final_state, dict):
                 speed = float(final_state.get("current_speed_kmh", 0.0))
-                self.speedometer.setSpeed(speed, duration=950)
+                # Gradually wind the speed down to 0 over ~3 s to simulate
+                # the vehicle coming to a stop at the destination.
+                if is_manual_stop:
+                    # Manual stop: snap to 0 immediately (already done by
+                    # _on_stop_clicked, but guard here for safety).
+                    self.speedometer.setSpeed(0, duration=1000)
+                else:
+                    # Natural trip end: animate current speed → 0 in stages
+                    # so the needle visibly decelerates to a stop.
+                    WIND_DOWN_MS = 3000
+                    self.speedometer.setSpeed(speed * 0.5,
+                                              duration=WIND_DOWN_MS // 3,
+                                              easing=QEasingCurve.Type.OutCubic)
+                    QTimer.singleShot(
+                        WIND_DOWN_MS // 3,
+                        lambda: self.speedometer.setSpeed(
+                            0, duration=WIND_DOWN_MS * 2 // 3,
+                            easing=QEasingCurve.Type.OutQuad,
+                        )
+                    )
                 soc = float(final_state.get("battery_soc_pct", 100.0))
                 fuel = float(final_state.get("fuel_level_pct", 100.0))
                 self.progress_panel.set_battery(soc)
                 self.progress_panel.set_fuel(fuel)
                 dist_km = float(final_state.get("distance_traveled_km", 0.0))
+                # On natural trip completion animate the bar all the way to
+                # the full trip distance so it visibly fills to 100%.
+                if not is_manual_stop:
+                    self.progress_panel.mode_bar.animate_traveled(
+                        self._live_total_distance, duration=WIND_DOWN_MS
+                    )
                 self.progress_panel.mile_label.setText(f"{dist_km:.1f} km")
 
             ml_preds = trip_end.get("ml_predictions")

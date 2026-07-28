@@ -58,7 +58,7 @@ class SegmentedModeBar(QWidget):
         self._recommended_mode = mode
         self.update()
 
-    def paintEvent(self, event):
+    def paintEvent(self, a0):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
@@ -75,10 +75,6 @@ class SegmentedModeBar(QWidget):
                 bg = Colors.EV_BADGE_BG
                 fg = Colors.EV
                 text = "Electric"
-            elif mode == "hybrid":
-                bg = Colors.HYBRID_BADGE_BG
-                fg = Colors.HYBRID
-                text = "Hybrid"
             else:
                 bg = Colors.GAS_BADGE_BG
                 fg = Colors.GAS
@@ -96,8 +92,6 @@ class SegmentedModeBar(QWidget):
             x2 = (end / self._distance) * w
             if mode == "Electric":
                 color = Colors.EV
-            elif mode == "Hybrid":
-                color = Colors.HYBRID
             else:
                 color = Colors.GAS
             painter.setBrush(color)

@@ -77,13 +77,20 @@ def run_recommender_agent(
 
     raw_metrics = ml_metrics.get("raw", ml_metrics)
 
-    rec_mode = str(raw_metrics.get("recommended_mode", "hybrid")).upper()
     cost = float(user_input.get("trip_cost_usd") if user_input.get("trip_cost_usd") is not None else raw_metrics.get("trip_cost_usd", 0.0))
     fuel = float(user_input.get("fuel_used_l") if user_input.get("fuel_used_l") is not None else raw_metrics.get("fuel_used_l", 0.0))
     battery = float(user_input.get("battery_used_kwh") if user_input.get("battery_used_kwh") is not None else raw_metrics.get("battery_used_kwh", 0.0))
     co2 = float(user_input.get("co2_emissions_kg") if user_input.get("co2_emissions_kg") is not None else raw_metrics.get("co2_emissions_kg", 0.0))
     range_left = float(user_input.get("range_left_km") if user_input.get("range_left_km") is not None else raw_metrics.get("range_left_km", 0.0))
     trip_time = float(raw_metrics.get("trip_time_min", 0.0))
+
+    raw_rec = str(raw_metrics.get("recommended_mode", "ev")).upper()
+    if raw_rec in ("GAS", "ICE"):
+        rec_mode = "GAS"
+    elif raw_rec == "EV":
+        rec_mode = "EV"
+    else:
+        rec_mode = "GAS" if fuel > 0 else "EV"
 
     make = user_input.get("make") or vehicle_data.get("make", "")
     model = user_input.get("model") or vehicle_data.get("model", "")

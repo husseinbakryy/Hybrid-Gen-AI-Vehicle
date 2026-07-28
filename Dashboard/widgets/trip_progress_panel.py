@@ -97,17 +97,19 @@ class TripProgressPanel(Card):
 
         setattr(self, f"{attr_prefix}_bar", bar)
         setattr(self, f"{attr_prefix}_pct", pct)
+        if attr_prefix == "battery":
+            self.battery_bar = bar
+            self.battery_pct = pct
+        elif attr_prefix == "fuel":
+            self.fuel_bar = bar
+            self.fuel_pct = pct
         return col
 
     def set_mode(self, mode: str):
         if mode == "Electric":
             bg, fg = Colors.EV_BADGE_BG.name(), Colors.EV.name()
-        elif mode == "Hybrid":
-            bg, fg = Colors.HYBRID_BADGE_BG.name(), Colors.HYBRID.name()
-        elif mode == "Gas":
-            bg, fg = Colors.GAS_BADGE_BG.name(), Colors.GAS.name()
         else:
-            bg, fg = Colors.EV_BADGE_BG.name(), Colors.EV.name()
+            bg, fg = Colors.GAS_BADGE_BG.name(), Colors.GAS.name()
         self.mode_badge.setText(mode)
         self.mode_badge.setStyleSheet(
             f"background-color: {bg}; color: {fg}; font-size: 17px; font-weight: bold; "

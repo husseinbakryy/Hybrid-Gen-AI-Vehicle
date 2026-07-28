@@ -332,7 +332,7 @@ class DashboardView(QWidget):
 
             mode = state.get("current_mode")
             if mode:
-                mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Hybrid"}
+                mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Gas"}
                 self.progress_panel.set_mode(mode_map.get(str(mode).lower(), "Ready"))
 
                 mapped_mode = mode_map.get(str(mode).lower())
@@ -354,12 +354,12 @@ class DashboardView(QWidget):
             predictions = update.predictions
             raw = predictions.get("raw") if isinstance(predictions, dict) else predictions
             if isinstance(raw, dict):
-                cost = float(raw.get("trip_cost_usd", raw.get("cost", 0.0)))
-                trip_time_min = float(raw.get("trip_time_min", 0.0))
-                co2 = float(raw.get("co2_emissions_kg", raw.get("co2", 0.0)))
-                range_left = float(raw.get("range_left_km", 0.0))
-                fuel_l = float(raw.get("fuel_used_l", 0.0))
-                battery_kwh = float(raw.get("battery_used_kwh", 0.0))
+                cost = float(raw.get("trip_cost_usd") or raw.get("cost") or 0.0)
+                trip_time_min = float(raw.get("trip_time_min") or 0.0)
+                co2 = float(raw.get("co2_emissions_kg") or raw.get("co2") or 0.0)
+                range_left = float(raw.get("range_left_km") or 0.0)
+                fuel_l = float(raw.get("fuel_used_l") or 0.0)
+                battery_kwh = float(raw.get("battery_used_kwh") or 0.0)
 
                 # Adaptive duration: measure the real wall-clock gap between
                 # successive ml_update messages (same approach as the
@@ -392,7 +392,7 @@ class DashboardView(QWidget):
         elif msg_type == "mode_switch" and update.mode_switch:
             mode_data = update.mode_switch
             to_mode = mode_data.get("to") or mode_data.get("to_mode", "")
-            mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Hybrid"}
+            mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Gas"}
             if to_mode:
                 self.progress_panel.set_mode(mode_map.get(str(to_mode).lower(), "Ready"))
 
@@ -424,12 +424,12 @@ class DashboardView(QWidget):
             if ml_preds:
                 raw = ml_preds.get("raw") if isinstance(ml_preds, dict) else ml_preds
                 if isinstance(raw, dict):
-                    cost = float(raw.get("trip_cost_usd", raw.get("cost", 0.0)))
-                    trip_time_min = float(raw.get("trip_time_min", 0.0))
-                    co2 = float(raw.get("co2_emissions_kg", raw.get("co2", 0.0)))
-                    range_left = float(raw.get("range_left_km", 0.0))
-                    fuel_l = float(raw.get("fuel_used_l", 0.0))
-                    battery_kwh = float(raw.get("battery_used_kwh", 0.0))
+                    cost = float(raw.get("trip_cost_usd") or raw.get("cost") or 0.0)
+                    trip_time_min = float(raw.get("trip_time_min") or 0.0)
+                    co2 = float(raw.get("co2_emissions_kg") or raw.get("co2") or 0.0)
+                    range_left = float(raw.get("range_left_km") or 0.0)
+                    fuel_l = float(raw.get("fuel_used_l") or 0.0)
+                    battery_kwh = float(raw.get("battery_used_kwh") or 0.0)
                     self.stat_cards.animate_extended_stats(
                         cost, trip_time_min, co2, range_left, fuel_l, battery_kwh, duration=1000
                     )

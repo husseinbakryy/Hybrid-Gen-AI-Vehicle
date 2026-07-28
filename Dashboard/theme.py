@@ -53,11 +53,11 @@ class Colors:
     EV_DARK = ACCENT_DARK
     EV_GLOW = ACCENT_GLOW
     EV_BADGE_BG = QColor("#0f3d38")
-    GAS = QColor("#f4632e")
+    GAS = QColor("#ff7b00")
     GAS_BADGE_BG = QColor("#3d1f0f")
     GAS_LIGHT = QColor("#ffb477")
-    HYBRID = QColor("#df11fa")
-    HYBRID_BADGE_BG = QColor("#0f3a38")
+    HYBRID = GAS
+    HYBRID_BADGE_BG = GAS_BADGE_BG
     GREEN = CO2
     YELLOW = COST
     RED = TIME

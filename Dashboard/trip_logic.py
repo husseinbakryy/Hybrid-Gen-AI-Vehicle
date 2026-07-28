@@ -206,11 +206,7 @@ def mode_to_animation_segments(recommended_mode: str | None,
     mode = (recommended_mode or "").lower()
     if mode == "ev":
         return [[0, distance, "Electric"]]
-    elif mode == "hybrid":
-        midpoint = distance / 2
-        return [[0, midpoint, "Electric"], [midpoint, distance, "Gas"]]
     else:
-        # ice, unknown, or missing - default to Gas for the full trip
         return [[0, distance, "Gas"]]
 
 

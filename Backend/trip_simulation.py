@@ -114,6 +114,7 @@ class TripSimulation:
         ml_predict_fn: Callable,
         genai_fn: Callable,
         tts_fn: Callable | None = None,
+        stop_tts_fn: Callable | None = None,
     ):
         self.trip_input = trip_config.get("trip_input", {})
         self.user_context = trip_config.get("user_context", {})
@@ -122,6 +123,7 @@ class TripSimulation:
         self._ml_predict = ml_predict_fn
         self._genai_fn = genai_fn
         self._tts_fn = tts_fn
+        self._stop_tts_fn = stop_tts_fn
 
         self.total_distance_km = float(self.trip_input.get("distance_km", 10.0))
         self.road_type: str = self.trip_input.get("road_type", "urban")
@@ -167,7 +169,13 @@ class TripSimulation:
         self._time_multiplier = max(1, min(100, value))
 
     def set_voice_enabled(self, enabled: bool) -> None:
+        was_enabled = self._voice_enabled
         self._voice_enabled = enabled
+        if was_enabled and not enabled and self._stop_tts_fn:
+            try:
+                self._stop_tts_fn()
+            except Exception:
+                pass
 
     def tick(self, wall_dt_seconds: float = 1.0) -> list[SimEvent]:
         """Advance the simulation by wall_dt_seconds.

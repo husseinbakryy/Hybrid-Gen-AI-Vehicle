@@ -21,7 +21,7 @@ if str(MODELS_DIR) not in sys.path:
 from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_vehicles, insert_vehicle
 from logger import logger
 from pipeline.inference import predict_trip_structured
-from play_audio import generate_tts_audio, play_audio_file
+from play_audio import generate_tts_audio, play_audio_file, stop_current_playback
 from recommender import run_recommender_agent
 from trip_simulation import TripSimulation, build_trip_start_announcement
 
@@ -260,7 +260,8 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         summary_text = ""
         if isinstance(agent_recommendation, dict):
             summary_text = agent_recommendation.get("summary", "")
-        if summary_text:
+        voice_enabled = bool(user_context.get("voice_enabled", True)) if isinstance(user_context, dict) else True
+        if summary_text and voice_enabled:
             threading.Thread(target=_async_generate_and_play_tts, args=(summary_text,), daemon=True).start()
 
         raw_out = ml_results.get("raw", {})
@@ -363,6 +364,7 @@ async def websocket_trip_live(ws: WebSocket):
         ml_predict_fn=predict_trip_structured,
         genai_fn=run_recommender_agent,
         tts_fn=_async_generate_and_play_tts,
+        stop_tts_fn=stop_current_playback,
     )
 
     await ws.send_json({"type": "connected", "vehicle": vehicle_doc})

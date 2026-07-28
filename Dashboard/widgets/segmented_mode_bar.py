@@ -3,6 +3,7 @@ from PyQt6.QtGui import QPainter, QPen, QColor
 from PyQt6.QtCore import Qt, QPointF, QRectF
 
 from theme import Colors
+from animations import animate_value
 
 
 class SegmentedModeBar(QWidget):
@@ -18,6 +19,7 @@ class SegmentedModeBar(QWidget):
         self._stops: list[int] = []
         self._distance = 1.0
         self._traveled = 0.0
+        self._traveled_anim = None
 
     def set_plan(self, segments: list[list], stops: list[int], distance: float):
         self._segments = segments
@@ -27,6 +29,26 @@ class SegmentedModeBar(QWidget):
 
     def set_traveled(self, miles: float):
         self._traveled = miles
+        self.update()
+
+    def animate_traveled(self, miles: float, duration: int):
+        """Glide self._traveled to miles over duration ms, instead of
+        snapping instantly - same gap-measured animation treatment already
+        applied to the speedometer and battery/fuel bars (see
+        Speedometer._set_display_speed)."""
+        if self._traveled_anim is not None:
+            self._traveled_anim.stop()
+
+        self._traveled_anim = animate_value(
+            self._set_traveled_display,
+            self._traveled,
+            miles,
+            duration=duration,
+            parent=self,
+        )
+
+    def _set_traveled_display(self, value: float):
+        self._traveled = value
         self.update()
 
     def set_recommended_mode(self, mode: str | None):

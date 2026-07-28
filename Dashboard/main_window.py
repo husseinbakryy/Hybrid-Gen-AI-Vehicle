@@ -347,7 +347,7 @@ class DashboardView(QWidget):
                         self._live_mode_segments, [], self._live_total_distance
                     )
 
-            self.progress_panel.mode_bar.set_traveled(dist_km)
+            self.progress_panel.mode_bar.animate_traveled(dist_km, duration=int(gap_ms))
 
         elif msg_type == "ml_update" and update.predictions:
             predictions = update.predictions

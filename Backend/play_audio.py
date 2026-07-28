@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from typing import Optional
 from urllib import request
@@ -10,6 +11,22 @@ from dotenv import load_dotenv
 
 _THIS_DIR = Path(__file__).resolve().parent
 load_dotenv(_THIS_DIR / ".env")
+
+_playback_lock = threading.Lock()
+_current_process = None   # subprocess.Popen | None
+
+
+def stop_current_playback() -> None:
+    """Immediately terminate whatever audio is currently playing,
+    if anything. Safe to call even if nothing is playing."""
+    global _current_process
+    with _playback_lock:
+        if _current_process is not None and _current_process.poll() is None:
+            try:
+                _current_process.terminate()
+            except Exception:
+                pass
+        _current_process = None
 
 
 def play_audio_file(audio_path: str | Path) -> Path:
@@ -34,19 +51,47 @@ def play_audio_file(audio_path: str | Path) -> Path:
             f"$player.Close()"
         )
         try:
-            subprocess.run(
+            process = subprocess.Popen(
                 ["powershell", "-NoProfile", "-Command", ps_script],
-                timeout=60,
-                check=False,
             )
+            with _playback_lock:
+                _current_process = process
+            try:
+                process.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                process.kill()
+            finally:
+                with _playback_lock:
+                    if _current_process is process:
+                        _current_process = None
         except Exception as exc:
             print(f"[Audio] PowerShell playback failed: {exc}")
         return output_path
 
     if sys.platform == "darwin":
-        subprocess.run(["afplay", "-r", "1.4", str(output_path)], check=False)
+        process = subprocess.Popen(["afplay", "-r", "1.4", str(output_path)])
+        with _playback_lock:
+            _current_process = process
+        try:
+            process.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        finally:
+            with _playback_lock:
+                if _current_process is process:
+                    _current_process = None
     else:
-        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-af", "atempo=1.4", str(output_path)], check=False)
+        process = subprocess.Popen(["ffplay", "-nodisp", "-autoexit", "-af", "atempo=1.4", str(output_path)])
+        with _playback_lock:
+            _current_process = process
+        try:
+            process.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            process.kill()
+        finally:
+            with _playback_lock:
+                if _current_process is process:
+                    _current_process = None
 
     return output_path
 

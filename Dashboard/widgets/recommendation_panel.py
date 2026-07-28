@@ -25,5 +25,17 @@ class RecommendationPanel(Card):
     def set_text(self, text: str):
         self.text_label.setText(text)
 
+    def set_status(self, text: str, color):
+        """Big, bold, colored status message - distinct from normal
+        AI-summary styling. Used for trip-ended states (stopped/arrived)
+        so they're unmistakably visible, not blended in with regular text."""
+        self.text_label.setStyleSheet(
+            f"color: {color.name()}; font-size: 24px; font-weight: bold;"
+        )
+        self.text_label.setText(text)
+
     def reset_text(self):
+        self.text_label.setStyleSheet(
+            f"color: {Colors.TEXT_SECONDARY.name()}; font-size: 13px;"
+        )
         self.text_label.setText(DEFAULT_TEXT)

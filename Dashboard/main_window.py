@@ -23,6 +23,7 @@ class DashboardView(QWidget):
     def __init__(self):
         super().__init__()
         self._live_worker: LiveTripWorker | None = None
+        self._manual_stop: bool = False
         self._last_tick_wall_time: float | None = None
         self._last_ml_update_wall_time: float | None = None
         self._run_dist: float = 0.0
@@ -273,6 +274,7 @@ class DashboardView(QWidget):
             self._live_worker.stop()
             self._live_worker = None
 
+        self._manual_stop = False
         self.live_controls.set_pedals_enabled(True)
         self._live_worker = LiveTripWorker(payload)
         self._live_worker.updateReceived.connect(self._on_live_update)
@@ -409,6 +411,7 @@ class DashboardView(QWidget):
 
         elif msg_type == "trip_end" and update.trip_end:
             trip_end = update.trip_end
+            is_manual_stop = self._manual_stop
             final_state = trip_end.get("final_state")
             if final_state and isinstance(final_state, dict):
                 speed = float(final_state.get("current_speed_kmh", 0.0))
@@ -444,6 +447,15 @@ class DashboardView(QWidget):
                         text += "\n\nActions:\n" + "\n".join(f"• {a}" for a in actions[:6])
                     self.recommendation.set_text(text)
 
+            # Applied LAST, after the ml_preds/genai_rec block above, so
+            # this status is guaranteed to be the final visible state of
+            # the recommendation panel - not silently overwritten by the
+            # genai summary that runs earlier in this same branch.
+            if is_manual_stop:
+                self.recommendation.set_status("Trip stopped.", Colors.TIME)
+            else:
+                self.recommendation.set_status("You have arrived!", Colors.CO2)
+
             self.live_controls.set_pedals_enabled(False)
 
         elif msg_type == "error" and update.error:
@@ -468,9 +480,12 @@ class DashboardView(QWidget):
         # Explicit requirement: stopping a live trip freezes the trip in place and
         # disables pedals. It does NOT swap the sidebar back, hide header cluster,
         # or touch any displayed stat values. Only Reset resets the UI.
+        self._manual_stop = True
         if self._live_worker is not None:
             self._live_worker.stop()
         self.live_controls.set_pedals_enabled(False)
+        self.speedometer.setSpeed(0, duration=1000)
+        self.recommendation.set_status("Trip stopped.", Colors.TIME)
 
     def _reset_trip(self):
         self._last_tick_wall_time = None

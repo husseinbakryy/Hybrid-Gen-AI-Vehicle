@@ -25,3 +25,4 @@
 2026-07-28 12:13:56 [INFO] WS ACTION | Driver action: coast
 2026-07-28 12:13:58 [INFO] WS ACTION | Stop trip requested by client
 2026-07-28 12:13:59 [INFO] [WS] Trip session closed
+2026-07-28 15:51:32 [INFO] [Backend Startup] Pre-loaded ML pipeline models into memory.

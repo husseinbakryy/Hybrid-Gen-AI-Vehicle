@@ -102,6 +102,8 @@ class TripProgressPanel(Card):
     def set_mode(self, mode: str):
         if mode == "Electric":
             bg, fg = Colors.EV_BADGE_BG.name(), Colors.EV.name()
+        elif mode == "Hybrid":
+            bg, fg = Colors.HYBRID_BADGE_BG.name(), Colors.HYBRID.name()
         elif mode == "Gas":
             bg, fg = Colors.GAS_BADGE_BG.name(), Colors.GAS.name()
         else:

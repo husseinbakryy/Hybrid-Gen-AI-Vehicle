@@ -76,8 +76,8 @@ class SegmentedModeBar(QWidget):
                 fg = Colors.EV
                 text = "Electric"
             elif mode == "hybrid":
-                bg = Colors.GAS_BADGE_BG
-                fg = Colors.GAS
+                bg = Colors.HYBRID_BADGE_BG
+                fg = Colors.HYBRID
                 text = "Hybrid"
             else:
                 bg = Colors.GAS_BADGE_BG
@@ -94,7 +94,12 @@ class SegmentedModeBar(QWidget):
         for start, end, mode in self._segments:
             x1 = (start / self._distance) * w
             x2 = (end / self._distance) * w
-            color = Colors.EV if mode == "Electric" else Colors.GAS
+            if mode == "Electric":
+                color = Colors.EV
+            elif mode == "Hybrid":
+                color = Colors.HYBRID
+            else:
+                color = Colors.GAS
             painter.setBrush(color)
             painter.drawRect(QRectF(x1, 0, max(1.0, x2 - x1), h))
 

@@ -110,8 +110,8 @@ class TripProgressPanel(Card):
             bg, fg = Colors.EV_BADGE_BG.name(), Colors.EV.name()
         self.mode_badge.setText(mode)
         self.mode_badge.setStyleSheet(
-            f"background-color: {bg}; color: {fg}; font-size: 11px; "
-            "padding: 3px 10px; border-radius: 6px;"
+            f"background-color: {bg}; color: {fg}; font-size: 17px; font-weight: bold; "
+            "padding: 6px 16px; border-radius: 6px;"
         )
 
     def set_plan(self, segments: list[list], stops: list[int], distance: float):

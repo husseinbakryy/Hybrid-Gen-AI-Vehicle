@@ -19,6 +19,7 @@ if str(MODELS_DIR) not in sys.path:
     sys.path.insert(0, str(MODELS_DIR))
 
 from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_vehicles, insert_vehicle
+from logger import logger
 from pipeline.inference import predict_trip_structured
 from play_audio import generate_tts_audio, play_audio_file
 from recommender import run_recommender_agent
@@ -95,9 +96,9 @@ def prewarm_assets():
     try:
         from pipeline.inference import load_assets
         load_assets()
-        print("[Backend Startup] Pre-loaded ML pipeline models into memory.")
+        logger.info("[Backend Startup] Pre-loaded ML pipeline models into memory.")
     except Exception as exc:
-        print(f"[Backend Startup] Warning: ML pre-warm failed: {exc}")
+        logger.warning(f"[Backend Startup] Warning: ML pre-warm failed: {exc}")
 
 
 @app.get("/health")
@@ -164,6 +165,8 @@ def add_vehicle(payload: AddVehicleRequest):
 
         vehicle_dict = payload.model_dump(exclude_none=True)
         saved = insert_vehicle(vehicle_dict)
+        logger.info(f"INPUT | Add vehicle: {payload.make} {payload.model} ({payload.powertrain_type})")
+        logger.info(f"OUTPUT | Created vehicle ID: {saved.get('id', 'N/A')}")
 
         return {
             "status": "created",
@@ -202,6 +205,11 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             )
 
         specs = vehicle_doc.get("specifications", {})
+
+        logger.info(
+            f"INPUT | Recommend request: {make} {model} | Distance: {dist_km} km | "
+            f"Road: {trip_input.get('road_type', 'N/A')} | Weather: {trip_input.get('weather', 'N/A')} ({trip_input.get('ambient_temp_c', 20)}°C)"
+        )
 
         full_ml_features = {
             "make": make,
@@ -254,6 +262,20 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
             summary_text = agent_recommendation.get("summary", "")
         if summary_text:
             threading.Thread(target=_async_generate_and_play_tts, args=(summary_text,), daemon=True).start()
+
+        raw_out = ml_results.get("raw", {})
+        rec_m = raw_out.get("recommended_mode", "N/A")
+        c_cost = raw_out.get("trip_cost_usd", 0.0)
+        c_time = raw_out.get("trip_time_min", 0.0)
+        c_fuel = raw_out.get("fuel_used_l", 0.0)
+        c_batt = raw_out.get("battery_used_kwh", 0.0)
+        c_co2 = raw_out.get("co2_emissions_kg", 0.0)
+        logger.info(
+            f"OUTPUT | Mode: {str(rec_m).upper()} | Cost: ${c_cost:.2f} | Time: {c_time:.1f}m | "
+            f"Fuel: {c_fuel:.2f}L | Battery: {c_batt:.1f}kWh | CO2: {c_co2:.1f}kg"
+        )
+        if summary_text:
+            logger.info(f"GENAI | Summary: {summary_text[:120]}")
 
         return {
             "status": "success",
@@ -344,7 +366,7 @@ async def websocket_trip_live(ws: WebSocket):
     )
 
     await ws.send_json({"type": "connected", "vehicle": vehicle_doc})
-    print(f"[WS] Trip simulation started: {make} {model}, {trip_input.get('distance_km', '?')} km")
+    logger.info(f"WS CONNECT | Vehicle: {make} {model} | Distance: {trip_input.get('distance_km', '?')} km")
 
     # TTS trip start announcement
     start_text = build_trip_start_announcement(vehicle_doc, trip_input)
@@ -363,11 +385,15 @@ async def websocket_trip_live(ws: WebSocket):
 
                     if action in ("accelerate", "brake", "coast"):
                         sim.set_action(action)
+                        logger.info(f"WS ACTION | Driver action: {action}")
                     elif action == "set_time_multiplier":
-                        sim.set_time_multiplier(int(msg.get("value", 1)))
+                        val = int(msg.get("value", 1))
+                        sim.set_time_multiplier(val)
+                        logger.info(f"WS ACTION | Time multiplier set to {val}x")
                     elif action == "toggle_voice":
                         sim.set_voice_enabled(bool(msg.get("enabled", True)))
                     elif action == "stop":
+                        logger.info("WS ACTION | Stop trip requested by client")
                         events = sim.stop()
                         for ev in events:
                             await ws.send_json({"type": ev.event_type, **ev.data})
@@ -389,11 +415,19 @@ async def websocket_trip_live(ws: WebSocket):
             events = sim.tick(wall_dt_seconds=1.0)
             for ev in events:
                 await ws.send_json({"type": ev.event_type, **ev.data})
+                if ev.event_type == "mode_switch":
+                    logger.info(f"WS EVENT | Mode switched: {ev.data.get('from')} -> {ev.data.get('to')} ({ev.data.get('reason')})")
+                elif ev.event_type == "trip_end":
+                    final_st = ev.data.get("final_state", {})
+                    logger.info(
+                        f"WS TRIP END | Reason: {ev.data.get('reason')} | Dist: {final_st.get('distance_traveled_km', 0.0):.1f}km | "
+                        f"Fuel: {final_st.get('fuel_used_l', 0.0):.2f}L | Battery: {final_st.get('battery_used_kwh', 0.0):.1f}kWh"
+                    )
             await asyncio.sleep(1.0)
     except WebSocketDisconnect:
-        print("[WS] Client disconnected.")
+        logger.info("[WS] Client disconnected")
     except Exception as exc:
-        print(f"[WS] Error in tick loop: {exc}")
+        logger.error(f"[WS] Error in tick loop: {exc}")
         try:
             await ws.send_json({"type": "error", "detail": str(exc)})
         except Exception:
@@ -404,7 +438,7 @@ async def websocket_trip_live(ws: WebSocket):
             await listener_task
         except (asyncio.CancelledError, Exception):
             pass
-        print("[WS] Trip session ended.")
+        logger.info("[WS] Trip session closed")
 
 
 if __name__ == "__main__":

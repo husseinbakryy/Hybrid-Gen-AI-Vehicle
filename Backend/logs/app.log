@@ -1,0 +1,27 @@
+2026-07-28 12:10:59 [INFO] [Backend Startup] Pre-loaded ML pipeline models into memory.
+2026-07-28 12:12:48 [INFO] WS CONNECT | Vehicle: Opel Astra | Distance: 61 km
+2026-07-28 12:13:03 [INFO] WS ACTION | Driver action: accelerate
+2026-07-28 12:13:05 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:06 [INFO] WS ACTION | Time multiplier set to 100x
+2026-07-28 12:13:22 [INFO] WS EVENT | Mode switched: hybrid -> ev (Conditions favor pure electric mode.)
+2026-07-28 12:13:22 [INFO] WS ACTION | Driver action: accelerate
+2026-07-28 12:13:24 [INFO] WS EVENT | Mode switched: ev -> ice (Battery depleted or high-speed driving detected.)
+2026-07-28 12:13:24 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:30 [INFO] WS ACTION | Driver action: accelerate
+2026-07-28 12:13:31 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:35 [INFO] WS ACTION | Driver action: brake
+2026-07-28 12:13:38 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:39 [INFO] WS ACTION | Driver action: accelerate
+2026-07-28 12:13:41 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:42 [INFO] WS ACTION | Driver action: accelerate
+2026-07-28 12:13:43 [INFO] WS EVENT | Mode switched: ice -> ev (Lower speed or favorable conditions for electric driving.)
+2026-07-28 12:13:44 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:44 [INFO] WS EVENT | Mode switched: ev -> ice (Battery depleted or high-speed driving detected.)
+2026-07-28 12:13:51 [INFO] WS ACTION | Driver action: accelerate
+2026-07-28 12:13:52 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:55 [INFO] WS EVENT | Mode switched: ice -> hybrid (Lower speed or favorable conditions for electric driving.)
+2026-07-28 12:13:55 [INFO] WS ACTION | Driver action: accelerate
+2026-07-28 12:13:56 [INFO] WS EVENT | Mode switched: hybrid -> ice (High power demand requires combustion engine.)
+2026-07-28 12:13:56 [INFO] WS ACTION | Driver action: coast
+2026-07-28 12:13:58 [INFO] WS ACTION | Stop trip requested by client
+2026-07-28 12:13:59 [INFO] [WS] Trip session closed

@@ -77,17 +77,17 @@ def vehicle_spec_from_db(vehicle_doc: dict[str, Any]) -> VehicleSpec:
     """Build a VehicleSpec from a database vehicle document."""
     specs = vehicle_doc.get("specifications", {})
     return VehicleSpec(
-        mass_kg=float(specs.get("massKg", 1500.0)),
-        drag_coeff=float(specs.get("dragCoeff", 0.28)),
-        frontal_area_m2=float(specs.get("frontalAreaM2", 2.3)),
-        rolling_resistance_coeff=float(specs.get("rollingResistanceCoeff", 0.008)),
-        drivetrain_efficiency=float(specs.get("drivetrainEfficiency", 0.35)),
-        regen_efficiency=float(specs.get("regenEfficiency", 0.70)),
-        usable_battery_kwh=float(specs.get("usableBatteryKwh", 0.0)),
-        fuel_tank_l=float(specs.get("fuelTankL", 0.0)),
-        powertrain_type=(specs.get("powertrainType") or vehicle_doc.get("powertrain_type", "hybrid")).lower(),
-        battery_health=float(specs.get("batteryHealth", 1.0)),
-        vehicle_health_factor=float(specs.get("vehicleHealthFactor", 1.0)),
+        mass_kg=float(specs.get("massKg", specs.get("mass_kg", vehicle_doc.get("mass_kg", 1500.0)))),
+        drag_coeff=float(specs.get("dragCoeff", specs.get("drag_coeff", vehicle_doc.get("drag_coeff", 0.28)))),
+        frontal_area_m2=float(specs.get("frontalAreaM2", specs.get("frontal_area_m2", vehicle_doc.get("frontal_area_m2", 2.3)))),
+        rolling_resistance_coeff=float(specs.get("rollingResistanceCoeff", specs.get("rolling_resistance_coeff", vehicle_doc.get("rolling_resistance_coeff", 0.008)))),
+        drivetrain_efficiency=float(specs.get("drivetrainEfficiency", specs.get("drivetrain_efficiency", vehicle_doc.get("drivetrain_efficiency", 0.35)))),
+        regen_efficiency=float(specs.get("regenEfficiency", specs.get("regen_efficiency", vehicle_doc.get("regen_efficiency", 0.70)))),
+        usable_battery_kwh=float(specs.get("usableBatteryKwh", specs.get("usable_battery_kwh", vehicle_doc.get("usable_battery_kwh", 0.0)))),
+        fuel_tank_l=float(specs.get("fuelTankL", specs.get("fuel_tank_l", vehicle_doc.get("fuel_tank_l", 0.0)))),
+        powertrain_type=(specs.get("powertrainType") or specs.get("powertrain_type") or vehicle_doc.get("powertrain_type", "hybrid")).lower(),
+        battery_health=float(specs.get("batteryHealth", specs.get("battery_health", vehicle_doc.get("battery_health", 1.0)))),
+        vehicle_health_factor=float(specs.get("vehicleHealthFactor", specs.get("vehicle_health_factor", vehicle_doc.get("vehicle_health_factor", 1.0)))),
     )
 
 

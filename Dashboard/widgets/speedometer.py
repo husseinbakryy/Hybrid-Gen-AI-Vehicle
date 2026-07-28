@@ -59,6 +59,8 @@ class Speedometer(QWidget):
     def speed(self) -> float:
         return self._speed
 
+  
+    # pyrefly: ignore [bad-override-param-name]
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -95,6 +97,7 @@ class Speedometer(QWidget):
         # start_deg is NOT negated - it needs to land at the same 225deg
         # position (bottom-left) as the "0" tick mark. Only span_deg is
         # negative, since the fill sweeps clockwise as speed increases.
+        # pyrefly: ignore [unnecessary-type-conversion]
         painter.drawArc(arc_rect, int(start_deg * 16), int(-span_deg * 16))
 
     def _draw_ticks(self, painter, center, radius):

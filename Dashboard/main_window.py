@@ -316,6 +316,19 @@ class DashboardView(QWidget):
             mm = round((elapsed_sec % 3600) // 60)
             self.stat_cards.time_tile.set_value(f"{hh}h {mm}m")
 
+            fuel_l = float(state.get("cumulative_fuel_used_l", state.get("fuel_used_l", 0.0)))
+            battery_kwh = float(state.get("cumulative_battery_used_kwh", state.get("battery_used_kwh", 0.0)))
+            co2_kg = float(state.get("co2_emitted_kg", 0.0))
+            cost_usd = float(state.get("trip_cost_usd", 0.0))
+            range_left = float(state.get("range_left_km", 0.0))
+
+            self.stat_cards.fuel_tile.set_value(f"{fuel_l:.2f} L")
+            self.stat_cards.battery_tile.set_value(f"{battery_kwh:.1f} kWh")
+            self.stat_cards.co2_tile.set_value(f"{co2_kg:.1f}kg")
+            self.stat_cards.cost_tile.set_value(f"${cost_usd:.2f}")
+            if range_left > 0:
+                self.stat_cards.range_tile.set_value(f"{round(range_left)} km")
+
             mode = state.get("current_mode")
             if mode:
                 mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Hybrid"}

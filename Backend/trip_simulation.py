@@ -40,6 +40,7 @@ class TripState:
     trip_cost_usd: float = 0.0
     current_mode: str = "ev"
     switch_point_km: float | None = None
+    range_left_km: float = 0.0
 
     # Cumulative energy
     battery_used_kwh: float = 0.0
@@ -55,6 +56,9 @@ class TripState:
         for key, val in d.items():
             if isinstance(val, float):
                 d[key] = round(val, 4)
+        # Explicit synonyms for clarity
+        d["cumulative_fuel_used_l"] = d["fuel_used_l"]
+        d["cumulative_battery_used_kwh"] = d["battery_used_kwh"]
         return d
 
 
@@ -129,12 +133,17 @@ class TripSimulation:
 
         # State
         self.state = TripState()
+        req_mode = str(self.trip_input.get("mode") or self.trip_input.get("current_mode") or "").lower()
         if self.vehicle.powertrain_type == "ev":
             self.state.current_mode = "ev"
         elif self.vehicle.powertrain_type == "ice":
             self.state.current_mode = "ice"
         else:
-            self.state.current_mode = "ev"
+            if req_mode in ("ev", "hybrid", "ice"):
+                self.state.current_mode = req_mode
+            else:
+                self.state.current_mode = "hybrid"
+        self.state.range_left_km = compute_range_left(self.state.battery_soc_pct, self.state.fuel_level_pct, self.vehicle)
 
         # User controls
         self._current_action: str = "coast"
@@ -226,6 +235,8 @@ class TripSimulation:
         if self.vehicle.fuel_tank_l > 0:
             used_pct = (energy["fuel_used_l"] / self.vehicle.fuel_tank_l) * 100.0
             self.state.fuel_level_pct = max(0.0, self.state.fuel_level_pct - used_pct)
+
+        self.state.range_left_km = compute_range_left(self.state.battery_soc_pct, self.state.fuel_level_pct, self.vehicle)
 
         if self.state.battery_soc_pct <= 0.0 and self.vehicle.powertrain_type != "ice":
             if self.state.current_mode != "ice" and self.vehicle.fuel_tank_l > 0:

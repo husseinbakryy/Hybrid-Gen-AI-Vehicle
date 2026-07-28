@@ -156,7 +156,7 @@ class DashboardView(QWidget):
         # Header live controls signal wiring
         self.header.stopClicked.connect(self._on_stop_clicked)
         self.header.muteToggled.connect(
-            lambda enabled: self._live_worker.send_voice_toggle(enabled) if self._live_worker else None
+            lambda is_muted: self._live_worker.send_voice_toggle(not is_muted) if self._live_worker else None
         )
         self.header.multiplierChanged.connect(
             lambda mult: self._live_worker.send_multiplier(mult) if self._live_worker else None

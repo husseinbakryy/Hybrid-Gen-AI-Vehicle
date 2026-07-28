@@ -137,7 +137,7 @@ def play_audio_file(audio_path: str | Path) -> Path:
             f"Start-Sleep -Seconds ([math]::Ceiling($duration)); "
             f"$player.Close()"
         )
-        process = subprocess.Popen(["powershell", "-NoProfile", "-Command", ps_script])
+        process = subprocess.Popen(["powershell", "-NoProfile", "-Sta", "-Command", ps_script])
         with _playback_lock:
             _current_process = process
         process.wait()

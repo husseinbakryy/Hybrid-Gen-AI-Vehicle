@@ -29,13 +29,13 @@ def build_agent_prompt(
         f"3. Vehicle Database Specifications: {json.dumps(vehicle_data, default=str)}\n"
         f"4. ML Pipeline 7-Target Predictions: {json.dumps(ml_metrics, default=str)}\n\n"
         "CRITICAL INSTRUCTIONS:\n"
-        "- Do NOT return generic, constant, or hardcoded boilerplate summaries.\n"
-        "- Synthesize the specific numbers provided above: trip distance, weather, road type, vehicle mass, battery capacity, "
-        "and all 7 ML pipeline predictions (Recommended Mode, Fuel Used, Battery Used, CO2 Emissions, Financial Cost, Remaining Range, Trip Duration).\n"
-        "- Formulate actionable recommendations specific to the current route, weather, and driving mode.\n\n"
+        "- Keep the summary SHORT and CONCISE (maximum 1-2 brief sentences).\n"
+        "- Do NOT include city names like Chicago unless explicitly requested by user input.\n"
+        "- Synthesize key numbers: distance, mode, duration, cost, energy usage (fuel/battery).\n"
+        "- Formulate actionable recommendations specific to the current route and driving mode.\n\n"
         "Return a strict JSON object with these exact keys:\n"
         "{\n"
-        '  "summary": "<Dynamic narrative referencing vehicle name, city/route, predicted trip duration, cost, fuel/battery consumption, and mode>",\n'
+        '  "summary": "<Short 1-2 sentence narrative with vehicle name, duration, cost, fuel/battery usage, and mode>",\n'
         '  "suggested_mode": "<Recommended driving mode>",\n'
         '  "actions": ["<Action 1>", "<Action 2>", "<Action 3>"],\n'
         '  "confidence": "high" | "medium" | "low",\n'
@@ -78,11 +78,11 @@ def run_recommender_agent(
     raw_metrics = ml_metrics.get("raw", ml_metrics)
 
     rec_mode = str(raw_metrics.get("recommended_mode", "hybrid")).upper()
-    cost = float(raw_metrics.get("trip_cost_usd", 0.0))
-    fuel = float(raw_metrics.get("fuel_used_l", 0.0))
-    battery = float(raw_metrics.get("battery_used_kwh", 0.0))
-    co2 = float(raw_metrics.get("co2_emissions_kg", 0.0))
-    range_left = float(raw_metrics.get("range_left_km", 0.0))
+    cost = float(user_input.get("trip_cost_usd") if user_input.get("trip_cost_usd") is not None else raw_metrics.get("trip_cost_usd", 0.0))
+    fuel = float(user_input.get("fuel_used_l") if user_input.get("fuel_used_l") is not None else raw_metrics.get("fuel_used_l", 0.0))
+    battery = float(user_input.get("battery_used_kwh") if user_input.get("battery_used_kwh") is not None else raw_metrics.get("battery_used_kwh", 0.0))
+    co2 = float(user_input.get("co2_emissions_kg") if user_input.get("co2_emissions_kg") is not None else raw_metrics.get("co2_emissions_kg", 0.0))
+    range_left = float(user_input.get("range_left_km") if user_input.get("range_left_km") is not None else raw_metrics.get("range_left_km", 0.0))
     trip_time = float(raw_metrics.get("trip_time_min", 0.0))
 
     make = user_input.get("make") or vehicle_data.get("make", "")
@@ -90,16 +90,17 @@ def run_recommender_agent(
     veh_name = vehicle_data.get("vehicle_name") or f"{make} {model}".strip() or "Vehicle"
     dist = user_input.get("distance_km", "N/A")
     weather = user_input.get("weather", "normal weather")
-    city = user_input.get("city", "the destination")
+    city = user_input.get("city", "")
     road_type = user_input.get("road_type", "road")
 
+    location_str = f" to {city}" if city and city.lower() != "chicago" else ""
+    summary_text = (
+        f"{veh_name}{location_str} ({dist} km, {weather}): Recommends {rec_mode} mode "
+        f"({trip_time:.1f} mins, ${cost:.2f}). Usage: {fuel:.2f}L fuel & {battery:.1f} kWh battery."
+    )
+
     fallback_response = {
-        "summary": (
-            f"Trip analysis for {veh_name} to {city} ({dist} km, {weather}): "
-            f"The ML pipeline recommends {rec_mode} mode, estimating a trip duration of {trip_time:.1f} mins "
-            f"and total cost of ${cost:.2f}. Expected energy usage is {fuel:.2f}L fuel and {battery:.2f} kWh battery, "
-            f"generating {co2:.2f} kg CO2 with {range_left:.1f} km range remaining."
-        ),
+        "summary": summary_text,
         "suggested_mode": rec_mode.lower(),
         "actions": [
             f"Drive efficiently on {road_type} routes to optimize {rec_mode} mode power distribution.",

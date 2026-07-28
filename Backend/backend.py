@@ -393,7 +393,9 @@ async def websocket_trip_live(ws: WebSocket):
                         sim.set_time_multiplier(val)
                         logger.info(f"WS ACTION | Time multiplier set to {val}x")
                     elif action == "toggle_voice":
-                        sim.set_voice_enabled(bool(msg.get("enabled", True)))
+                        enabled_val = bool(msg.get("enabled", True))
+                        set_muted(not enabled_val)
+                        sim.set_voice_enabled(enabled_val)
                     elif action == "stop":
                         logger.info("WS ACTION | Stop trip requested by client")
                         events = sim.stop()

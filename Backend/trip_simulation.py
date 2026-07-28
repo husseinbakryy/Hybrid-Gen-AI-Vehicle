@@ -440,7 +440,7 @@ class TripSimulation:
             "mass_kg": self.vehicle.mass_kg,
             "drag_coeff": self.vehicle.drag_coeff,
             "frontal_area_m2": self.vehicle.frontal_area_m2,
-            "city": self.trip_input.get("city", "Chicago"),
+            "city": self.trip_input.get("city", ""),
             "season": self.trip_input.get("season", "fall"),
             "weather": self.trip_input.get("weather", "clear"),
             "ambient_temp_c": self.ambient_temp_c,
@@ -469,7 +469,22 @@ class TripSimulation:
             enriched_input["current_mode"] = self.state.current_mode
             enriched_input["elapsed_minutes"] = self.state.elapsed_sim_seconds / 60.0
 
-            ml_metrics = self.state.ml_predictions or {}
+            # Pass live cumulative energy and cost metrics so GenAI updates reflect live fuel/battery usage
+            enriched_input["fuel_used_l"] = self.state.fuel_used_l
+            enriched_input["battery_used_kwh"] = self.state.battery_used_kwh
+            enriched_input["co2_emissions_kg"] = self.state.co2_emitted_kg
+            enriched_input["trip_cost_usd"] = self.state.trip_cost_usd
+            enriched_input["range_left_km"] = self.state.range_left_km
+
+            ml_metrics = dict(self.state.ml_predictions or {})
+            raw = dict(ml_metrics.get("raw", ml_metrics))
+            if self.state.distance_traveled_km > 0:
+                raw["fuel_used_l"] = self.state.fuel_used_l
+                raw["battery_used_kwh"] = self.state.battery_used_kwh
+                raw["co2_emissions_kg"] = self.state.co2_emitted_kg
+                raw["trip_cost_usd"] = self.state.trip_cost_usd
+                raw["range_left_km"] = self.state.range_left_km
+                ml_metrics["raw"] = raw
             result = self._genai_fn(
                 user_input=enriched_input,
                 vehicle_data=self.vehicle_doc,
@@ -495,19 +510,31 @@ class TripSimulation:
             ).start()
 
     def _determine_effective_mode(self) -> str:
-        """Dynamically evaluate the physically accurate operating mode for a hybrid vehicle.
-        
-        Applies real-world hybrid powertrain control strategies with hysteresis & hold time:
-        1. Critical Battery Override: SOC <= 15% forces Gas/Hybrid mode immediately.
-        2. Minimum Hold Time: Requires at least 8s between mode switches to prevent rapid hunting.
-        3. Speed Hysteresis Band: EV below 45 km/h, Hybrid above 55 km/h.
-        4. Initial Ignition Warm-up: First 10s or ambient < 10°C forces Hybrid.
-        5. Acceleration Boost: accel > 1.5 m/s^2 or 'accelerate' pedal engages Gas engine.
+        """Dynamically evaluate the physically accurate operating mode for a vehicle.
+
+        Applies real-world hybrid powertrain control strategies based on pedal inputs,
+        speed, acceleration, and battery State of Charge (SoC):
+
+        1. Critical Battery Depletion: SoC <= 15% forces pure Gas ('ice') mode if fuel is available.
+        2. Driver Pedal Actions (Immediate response to Gas / Brake pedals):
+           - Braking ('brake'): Shuts off gas engine -> Electric ('ev') mode for regenerative braking.
+           - Acceleration / Gas Pedal ('accelerate'):
+             * At high speed (> 65 km/h) or low battery (SoC <= 35%): Pure Gas ('ice') mode for engine power.
+             * At mid speed (35-65 km/h): Hybrid ('hybrid') mode (Electric motor + Gas engine boost).
+             * At low speed (< 35 km/h) with healthy battery (SoC > 35%): Electric ('ev') mode.
+        3. Vehicle Speed & Road Type Regime:
+           - Highway Cruising (speed >= 80 km/h or road_type == 'highway'): Pure Gas ('ice') mode (engine at peak thermal efficiency).
+           - City / Low Speed (speed < 45 km/h and SoC > 20%): Electric ('ev') mode (zero emissions).
+           - Suburban / Mid Speed (45-80 km/h): Hybrid ('hybrid') mode.
         """
         ptype = self.vehicle.powertrain_type.lower()
-        if ptype == "ev":
+        has_fuel = self.vehicle.fuel_tank_l > 0 or ptype != "ev"
+        has_battery = self.vehicle.usable_battery_kwh > 0 or ptype != "ice"
+
+        # Pure EV without fuel tank stays EV; pure ICE without battery stays ICE
+        if ptype == "ev" and self.vehicle.fuel_tank_l <= 0:
             return "ev"
-        if ptype == "ice":
+        if ptype == "ice" and self.vehicle.usable_battery_kwh <= 0:
             return "ice"
 
         soc = self.state.battery_soc_pct
@@ -515,34 +542,36 @@ class TripSimulation:
         accel = self.state.current_acceleration_mps2
         elapsed = self.state.elapsed_sim_seconds
         current = (self.state.current_mode or "hybrid").lower()
+        action = self._current_action
 
-        # 1. Critical Battery Override (always enforced)
-        if soc <= 15.0:
-            return "ice" if self.vehicle.fuel_tank_l > 0 else "hybrid"
+        # 1. Critical Battery Override: Low battery forces Gas mode
+        if has_fuel and soc <= 15.0:
+            return "ice"
 
-        # 2. Minimum Hold Time Guard (prevents rapid 1-second mode toggling)
+        # 2. Driver Pedal Action Overrides (Immediate response to Gas / Brake pedals)
+        if action == "brake":
+            if has_battery and soc < 98.0:
+                return "ev"
+
+        if action == "accelerate" or accel > 1.4:
+            if has_fuel and (speed >= 65.0 or soc <= 35.0):
+                return "ice"
+            elif has_battery and has_fuel and speed >= 35.0:
+                return "hybrid"
+            elif has_battery and soc > 35.0:
+                return "ev"
+
+        # 3. Minimum Hold Time Guard for automatic speed-based switching (2.5s for fast responsive feel)
         time_since_switch = elapsed - getattr(self, "_last_mode_switch_elapsed", -10.0)
-        if time_since_switch < 8.0:
+        if time_since_switch < 2.5:
             return current
 
-        # 3. Low Battery Recovery Hysteresis
-        if current in ("ice", "hybrid") and soc < 25.0:
-            return current
-
-        # 4. Initial Ignition Warm-up or Cold Start
-        if elapsed <= 10.0 or self.ambient_temp_c < 10.0:
-            return "hybrid"
-
-        # 5. Hard Acceleration Torque Boost
-        if accel > 1.5 or self._current_action == "accelerate":
-            return "hybrid"
-
-        # 6. Speed Hysteresis Band (below 45 km/h -> EV, above 55 km/h / highway -> Hybrid)
-        if speed > 75.0 or self.road_type == "highway":
-            return "hybrid"
-        if speed < 45.0 and soc > 25.0:
+        # 4. Speed & Road Type Regimes
+        if has_fuel and (speed >= 80.0 or self.road_type == "highway"):
+            return "ice"
+        elif has_battery and speed < 45.0 and soc > 20.0:
             return "ev"
-        if speed > 55.0 and current == "ev":
+        elif has_fuel and has_battery and 45.0 <= speed < 80.0:
             return "hybrid"
 
         return current
@@ -550,19 +579,23 @@ class TripSimulation:
     def _mode_switch_reason(self, old_mode: str, new_mode: str) -> str:
         soc = self.state.battery_soc_pct
         speed = self.state.current_speed_kmh
-        accel = self.state.current_acceleration_mps2
+        action = self._current_action
 
-        if soc <= 0.0:
-            return "Battery fully depleted (0%)."
-        if soc <= 15.0:
-            return f"Low battery reserve reached ({soc:.0f}%)."
-        if accel > 1.5 or self._current_action == "accelerate":
-            return "High acceleration requested."
-        if speed > 75.0 or self.road_type == "highway":
-            return "High-speed highway cruising."
-        if speed < 45.0:
-            return "Favorable speed for electric driving."
-        return "Driving conditions updated."
+        if soc <= 15.0 and new_mode == "ice":
+            return f"Low battery reserve ({soc:.0f}%) — Gas engine engaged."
+        if action == "brake" and new_mode == "ev":
+            return "Braking applied — Electric mode engaged for regenerative energy recovery."
+        if action == "accelerate" and new_mode == "ice":
+            return "Gas pedal pressed — Gas engine engaged for high power output."
+        if action == "accelerate" and new_mode == "hybrid":
+            return "Acceleration requested — Hybrid boost engaged (Motor + Engine)."
+        if speed >= 80.0 or (self.road_type == "highway" and new_mode == "ice"):
+            return "Highway speed — Gas engine active for peak thermal efficiency."
+        if speed < 45.0 and new_mode == "ev":
+            return "Low speed city driving — Electric mode engaged."
+        if new_mode == "hybrid":
+            return "Mid-speed driving — Hybrid power blending active."
+        return f"Driving parameters updated — switched to {new_mode.upper()} mode."
 
 
 def build_trip_start_announcement(

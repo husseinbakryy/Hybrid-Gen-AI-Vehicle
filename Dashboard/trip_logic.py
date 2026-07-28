@@ -29,7 +29,7 @@ GAS_COST_PER_MILE = 0.103    # NOTE: placeholder flat rate, not the trained mode
 CO2_PER_GAS_MILE = 0.04      # NOTE: placeholder, not sourced from real emissions data
 
 # These are confirmed fixed values for the current prototype.
-CITY = "Chicago"
+CITY = ""
 SEASON = "fall"
 
 # At startup this is intentionally empty; the app fetches the live

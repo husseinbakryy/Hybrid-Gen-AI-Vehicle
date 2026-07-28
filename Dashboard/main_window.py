@@ -156,9 +156,7 @@ class DashboardView(QWidget):
 
         # Header live controls signal wiring
         self.header.stopClicked.connect(self._on_stop_clicked)
-        self.header.muteToggled.connect(
-            lambda is_muted: self._live_worker.send_voice_toggle(not is_muted) if self._live_worker else None
-        )
+        self.header.muteToggled.connect(self._on_mute_toggled)
         self.header.multiplierChanged.connect(
             lambda mult: self._live_worker.send_multiplier(mult) if self._live_worker else None
         )
@@ -260,6 +258,8 @@ class DashboardView(QWidget):
                 cargo=self.trip_form.get_cargo_kg(),
                 style=self.trip_form.get_style(),
             )
+            is_muted = self.header.mute_btn.isChecked()
+            payload["user_context"]["voice_enabled"] = not is_muted
         except Exception as exc:
             self.recommendation.set_text(f"Error building payload: {exc}")
             return
@@ -286,6 +286,14 @@ class DashboardView(QWidget):
         self.progress_panel.set_plan([], [], trip_distance_km)
 
         self._update_start_enabled()
+
+    def _on_mute_toggled(self, is_muted: bool):
+        if self._live_worker:
+            self._live_worker.send_voice_toggle(not is_muted)
+        try:
+            requests.post("http://localhost:8000/api/audio/mute", json={"muted": is_muted}, timeout=0.5)
+        except Exception:
+            pass
 
     def _on_live_update(self, update):
         msg_type = update.message_type
@@ -751,3 +759,21 @@ class DashboardView(QWidget):
         self.progress_panel.mile_label.setText(f"{round(self._run_dist)} km")
         self.progress_panel.next_event_label.setText("")
         self._update_start_enabled()
+
+    def closeEvent(self, a0):
+        """Cleanly handle application shutdown: stop live worker and notify backend to mute & stop audio."""
+        self._manual_stop = True
+        if self._live_worker is not None:
+            try:
+                self._live_worker.send_voice_toggle(False)
+                self._live_worker.stop()
+            except Exception:
+                pass
+            self._live_worker = None
+
+        try:
+            requests.post("http://localhost:8000/api/audio/mute", json={"muted": True}, timeout=0.5)
+        except Exception:
+            pass
+
+        a0.accept()

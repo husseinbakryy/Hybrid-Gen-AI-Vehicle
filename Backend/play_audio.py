@@ -194,7 +194,7 @@ def generate_tts_audio(
 ) -> Optional[Path]:
     api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
 
-    if not text or not text.strip():
+    if _is_muted or not text or not text.strip():
         return None
 
     if len(text) > 4000:

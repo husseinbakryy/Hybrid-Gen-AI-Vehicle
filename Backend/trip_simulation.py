@@ -19,6 +19,7 @@ from trip_physics import (
     compute_tick_energy,
     vehicle_spec_from_db,
 )
+from play_audio import is_muted
 
 
 # ---------------------------------------------------------------------------
@@ -502,7 +503,7 @@ class TripSimulation:
         return events
 
     def _fire_tts(self, text: str) -> None:
-        if self._tts_fn and self._voice_enabled:
+        if self._tts_fn and self._voice_enabled and not is_muted():
             threading.Thread(
                 target=self._tts_fn,
                 args=(text,),

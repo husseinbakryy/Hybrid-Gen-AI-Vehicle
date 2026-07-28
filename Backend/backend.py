@@ -23,7 +23,7 @@ load_dotenv(BACKEND_DIR / ".env")
 from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_vehicles, insert_vehicle
 from logger import logger
 from pipeline.inference import predict_trip_structured
-from play_audio import enqueue_tts, set_muted, stop_current_playback
+from play_audio import enqueue_tts, set_muted, stop_current_playback, is_muted
 from recommender import run_recommender_agent  # pyrefly: ignore [missing-import]
 from trip_simulation import TripSimulation, build_trip_start_announcement
 
@@ -84,6 +84,8 @@ app = FastAPI(
 
 
 def _async_generate_and_play_tts(text: str):
+    if is_muted():
+        return
     try:
         enqueue_tts(text)
     except Exception as audio_exc:
@@ -261,7 +263,7 @@ def trip_recommendation_endpoint(payload: TripRecommendationRequest):
         if isinstance(agent_recommendation, dict):
             summary_text = agent_recommendation.get("summary", "")
         voice_enabled = bool(user_context.get("voice_enabled", True)) if isinstance(user_context, dict) else True
-        if summary_text and voice_enabled:
+        if summary_text and voice_enabled and not is_muted():
             threading.Thread(target=_async_generate_and_play_tts, args=(summary_text,), daemon=True).start()
 
         raw_out = ml_results.get("raw", {})
@@ -343,6 +345,7 @@ async def websocket_trip_live(ws: WebSocket):
 
     # ---- Validate & fetch vehicle -------------------------------------------
     trip_input = config.get("trip_input", {})
+    user_context = config.get("user_context", {})
     make = trip_input.get("make")
     model = trip_input.get("model")
 
@@ -373,7 +376,9 @@ async def websocket_trip_live(ws: WebSocket):
     # TTS trip start announcement
     start_text = build_trip_start_announcement(vehicle_doc, trip_input)
     await ws.send_json({"type": "voice_event", "event": "trip_start", "text": start_text})
-    threading.Thread(target=_async_generate_and_play_tts, args=(start_text,), daemon=True).start()
+    voice_enabled = bool(user_context.get("voice_enabled", True)) if isinstance(user_context, dict) else True
+    if voice_enabled and not is_muted():
+        threading.Thread(target=_async_generate_and_play_tts, args=(start_text,), daemon=True).start()
 
     # ---- Step 2: Tick loop + listen for client messages ---------------------
     async def _listen_for_client_messages():
@@ -447,6 +452,22 @@ async def websocket_trip_live(ws: WebSocket):
         except (asyncio.CancelledError, Exception):
             pass
         logger.info("[WS] Trip session closed")
+
+
+@app.post("/api/audio/mute")
+def api_set_mute(payload: dict | None = None):
+    muted = bool((payload or {}).get("muted", True))
+    set_muted(muted)
+    if muted:
+        stop_current_playback()
+    return {"status": "success", "muted": muted}
+
+
+@app.post("/api/audio/stop")
+def api_stop_audio():
+    set_muted(True)
+    stop_current_playback()
+    return {"status": "success"}
 
 
 if __name__ == "__main__":

@@ -89,6 +89,21 @@ LOW_BATTERY_THRESHOLD_PCT = 15.0
 SPEED_WARNING_URBAN_KMH = 80.0
 SPEED_WARNING_GENERAL_KMH = 120.0
 
+# Idle coast speed (km/h) used before any pedal has ever been pressed.
+IDLE_COAST_SPEED_KMH = 5.0
+
+# Same ease-rate bounds trip_physics.compute_speed_change uses for its own
+# coast branch (COAST_DECEL_MPS2 / MAX_ACCEL_MPS2 * 0.3), duplicated here so
+# the idle-speed ease can be computed without touching trip_physics.py.
+_IDLE_EASE_DECEL_MPS2 = -0.3
+_IDLE_EASE_ACCEL_MPS2 = 0.9
+
+
+def _clamp_idle_accel(speed_diff_kmh: float) -> float:
+    """Ease acceleration (m/s^2) toward IDLE_COAST_SPEED_KMH."""
+    raw_accel = speed_diff_kmh / 3.6 * 0.15
+    return max(_IDLE_EASE_DECEL_MPS2, min(_IDLE_EASE_ACCEL_MPS2, raw_accel))
+
 
 class TripSimulation:
     """Manages a single live trip simulation session.
@@ -161,8 +176,13 @@ class TripSimulation:
         self._speed_warned: bool = False
         self._finished: bool = False
 
+        # True once the driver has pressed accelerate or brake at least once.
+        self._pedal_used: bool = False
+
     def set_action(self, action: str) -> None:
         if action in ("accelerate", "brake", "coast"):
+            if action in ("accelerate", "brake"):
+                self._pedal_used = True
             self._current_action = action
 
     def set_time_multiplier(self, value: int) -> None:
@@ -199,13 +219,23 @@ class TripSimulation:
         # Fixed regardless of multiplier: keeps pedal response/speedometer identical to x1.
         SPEED_DT = 1.0
 
-        new_speed, accel = compute_speed_change(
-            self.state.current_speed_kmh,
-            self._current_action,
-            self.road_type,
-            self.traffic_level,
-            SPEED_DT,
-        )
+        if self._current_action == "coast" and not self._pedal_used:
+            # Before any pedal has ever been pressed, coast eases toward a
+            # fixed 5 km/h idle speed (up from below, down from above) and
+            # holds there, instead of drifting to the road's natural
+            # cruising speed. Mirrors the coast branch's own ease rate.
+            speed_diff_kmh = IDLE_COAST_SPEED_KMH - self.state.current_speed_kmh
+            accel = _clamp_idle_accel(speed_diff_kmh)
+            new_speed_mps = self.state.current_speed_kmh / 3.6 + accel * SPEED_DT
+            new_speed = max(0.0, new_speed_mps * 3.6)
+        else:
+            new_speed, accel = compute_speed_change(
+                self.state.current_speed_kmh,
+                self._current_action,
+                self.road_type,
+                self.traffic_level,
+                SPEED_DT,
+            )
 
         total_regen_kwh = 0.0
         if new_speed < old_speed and self._current_action == "brake":

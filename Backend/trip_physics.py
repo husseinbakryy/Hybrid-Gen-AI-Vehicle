@@ -116,8 +116,11 @@ def compute_speed_change(
     elif action == "brake":
         accel = MAX_DECEL_MPS2 * (0.6 + 0.4 * min(1.0, current_speed_kmh / 60.0))
     else:
-        base_speed = ROAD_BASE_SPEED_KMH.get(road_type, 45.0) * (1.0 - 0.3 * traffic_level)
-        speed_diff_kmh = base_speed - current_speed_kmh
+        COAST_TARGET_KMH = 5.0  # cars gradually settle to a slow idle/rolling
+                                  # speed when coasting, rather than
+                                  # accelerating up toward the road's typical
+                                  # traffic speed
+        speed_diff_kmh = COAST_TARGET_KMH - current_speed_kmh
         accel = _clamp(speed_diff_kmh / 3.6 * 0.15, COAST_DECEL_MPS2, MAX_ACCEL_MPS2 * 0.3)
 
     new_speed_mps = current_speed_mps + accel * dt_seconds

@@ -89,28 +89,21 @@ class StatCardsPanel(QWidget):
         self.battery_tile.set_value(f"{battery_kwh:.1f} kWh")
 
     def animate_extended_stats(self, cost, trip_time_min, co2, range_left, fuel_l, battery_kwh, duration=5000):
-        """Count all six tiles up from their previous values to the real
-        final ones over `duration` ms, instead of snapping instantly - meant
-        to run alongside the trip-bar animation so both finish together."""
+        """Count five tiles (Cost, CO2, Range Left, Fuel Used, Battery Used)
+        up from their previous values to the real final ones over `duration`
+        ms, instead of snapping instantly - meant to run alongside the
+        trip-bar animation so both finish together.
+
+        The Time tile is intentionally NOT touched here anymore - it's now a
+        live elapsed-time readout driven directly from tick updates (see
+        main_window.py's _on_live_update), not an ML prediction. The
+        trip_time_min argument is accepted for signature compatibility with
+        existing callers but has no effect."""
         self.cost_tile.animate_to(cost, prefix="$", decimals=2, duration=duration)
         self.co2_tile.animate_to(co2, suffix="kg", decimals=1, duration=duration)
         self.range_tile.animate_to(range_left, suffix=" km", decimals=0, duration=duration)
         self.fuel_tile.animate_to(fuel_l, suffix=" L", decimals=2, duration=duration)
         self.battery_tile.animate_to(battery_kwh, suffix=" kWh", decimals=1, duration=duration)
-
-        # Time is displayed as "Xh Ym", not a plain number, so it needs a
-        # custom tick-by-tick recompute instead of animate_to.
-        from animations import animate_value
-        start_minutes = self._last_time_minutes
-
-        def _update_time(v):
-            hh = int(v // 60)
-            mm = round(v % 60)
-            self.time_tile.set_value(f"{hh}h {mm}m")
-
-        animate_value(_update_time, start_minutes, trip_time_min,
-                      duration=duration, parent=self.time_tile)
-        self._last_time_minutes = trip_time_min
 
     def reset_stats(self):
         for tile in (self.cost_tile, self.time_tile, self.co2_tile, self.range_tile, self.fuel_tile, self.battery_tile):

@@ -155,7 +155,7 @@ class TripSimulation:
             self._current_action = action
 
     def set_time_multiplier(self, value: int) -> None:
-        self._time_multiplier = max(1, min(50, value))
+        self._time_multiplier = max(1, min(100, value))
 
     def set_voice_enabled(self, enabled: bool) -> None:
         self._voice_enabled = enabled

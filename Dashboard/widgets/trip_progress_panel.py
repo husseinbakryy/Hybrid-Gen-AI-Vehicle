@@ -10,6 +10,7 @@ from PyQt6.QtCore import pyqtSignal
 from widgets.card import Card
 from widgets.segmented_mode_bar import SegmentedModeBar
 from theme import Colors
+from animations import animate_value
 
 
 class TripProgressPanel(Card):
@@ -121,6 +122,22 @@ class TripProgressPanel(Card):
     def set_fuel(self, pct: float):
         self.fuel_bar.setValue(round(pct))
         self.fuel_pct.setText(f"{round(pct)}%")
+
+    def animate_battery(self, pct: float, duration: int):
+        """Glide the battery mini-bar/label from its current value to pct
+        over duration ms, instead of snapping instantly like set_battery."""
+        def _update(v):
+            self.battery_bar.setValue(round(v))
+            self.battery_pct.setText(f"{round(v)}%")
+        animate_value(_update, self.battery_bar.value(), pct, duration=duration, parent=self.battery_bar)
+
+    def animate_fuel(self, pct: float, duration: int):
+        """Glide the fuel mini-bar/label from its current value to pct
+        over duration ms, instead of snapping instantly like set_fuel."""
+        def _update(v):
+            self.fuel_bar.setValue(round(v))
+            self.fuel_pct.setText(f"{round(v)}%")
+        animate_value(_update, self.fuel_bar.value(), pct, duration=duration, parent=self.fuel_bar)
 
     def reset_display(self):
         self.set_mode("Ready")

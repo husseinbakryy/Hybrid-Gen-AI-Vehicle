@@ -24,10 +24,13 @@ class DashboardView(QWidget):
         super().__init__()
         self._live_worker: LiveTripWorker | None = None
         self._last_tick_wall_time: float | None = None
+        self._last_ml_update_wall_time: float | None = None
         self._run_dist: float = 0.0
         self._run_speed: float = 0.0
         self._run_stops: list = []
         self._run_segments: list = []
+        self._live_mode_segments: list[list] = []
+        self._live_total_distance: float = 1.0
 
         outer = QGridLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -237,7 +240,10 @@ class DashboardView(QWidget):
 
     def _start_trip(self):
         self._last_tick_wall_time = None
+        self._last_ml_update_wall_time = None
+        self._live_mode_segments = []
         self.header.show_live_controls()
+        trip_distance_km = self.trip_form.get_distance()
         try:
             payload = trip_logic.build_trip_payload(
                 vehicle=self.trip_form.get_selected_vehicle(),
@@ -248,7 +254,7 @@ class DashboardView(QWidget):
                 trip_purpose=self.trip_form.get_trip_purpose(),
                 road_type=self.trip_form.get_road_type(),
                 traffic=self.trip_form.get_traffic(),
-                distance=self.trip_form.get_distance(),
+                distance=trip_distance_km,
                 passengers=self.trip_form.get_passengers(),
                 cargo=self.trip_form.get_cargo_kg(),
                 style=self.trip_form.get_style(),
@@ -274,6 +280,9 @@ class DashboardView(QWidget):
         self._live_worker.connectionClosed.connect(self._on_live_connection_closed)
         self._live_worker.start()
 
+        self._live_total_distance = trip_distance_km
+        self.progress_panel.set_plan([], [], trip_distance_km)
+
         self._update_start_enabled()
 
     def _on_live_update(self, update):
@@ -296,16 +305,36 @@ class DashboardView(QWidget):
 
             soc = float(state.get("battery_soc_pct", 100.0))
             fuel = float(state.get("fuel_level_pct", 100.0))
-            self.progress_panel.set_battery(soc)
-            self.progress_panel.set_fuel(fuel)
+            self.progress_panel.animate_battery(soc, duration=int(gap_ms))
+            self.progress_panel.animate_fuel(fuel, duration=int(gap_ms))
 
             dist_km = float(state.get("distance_traveled_km", 0.0))
             self.progress_panel.mile_label.setText(f"{dist_km:.1f} km")
+
+            elapsed_sec = float(state.get("elapsed_sim_seconds", 0.0))
+            hh = int(elapsed_sec // 3600)
+            mm = round((elapsed_sec % 3600) // 60)
+            self.stat_cards.time_tile.set_value(f"{hh}h {mm}m")
 
             mode = state.get("current_mode")
             if mode:
                 mode_map = {"ev": "Electric", "ice": "Gas", "hybrid": "Hybrid"}
                 self.progress_panel.set_mode(mode_map.get(str(mode).lower(), "Ready"))
+
+                mapped_mode = mode_map.get(str(mode).lower())
+                if mapped_mode:
+                    if not self._live_mode_segments:
+                        self._live_mode_segments.append([0, dist_km, mapped_mode])
+                    elif self._live_mode_segments[-1][2] == mapped_mode:
+                        self._live_mode_segments[-1][1] = dist_km
+                    else:
+                        self._live_mode_segments[-1][1] = dist_km
+                        self._live_mode_segments.append([dist_km, dist_km, mapped_mode])
+                    self.progress_panel.set_plan(
+                        self._live_mode_segments, [], self._live_total_distance
+                    )
+
+            self.progress_panel.mode_bar.set_traveled(dist_km)
 
         elif msg_type == "ml_update" and update.predictions:
             predictions = update.predictions
@@ -318,9 +347,21 @@ class DashboardView(QWidget):
                 fuel_l = float(raw.get("fuel_used_l", 0.0))
                 battery_kwh = float(raw.get("battery_used_kwh", 0.0))
 
-                # Used 1000ms duration for live updates so counters update smoothly without overlapping
+                # Adaptive duration: measure the real wall-clock gap between
+                # successive ml_update messages (same approach as the
+                # speedometer's tick-based gap measurement) so these tiles
+                # glide across the real interval instead of snapping then
+                # sitting static until the next update arrives.
+                now = time.monotonic()
+                if self._last_ml_update_wall_time is None:
+                    ml_gap_ms = 10000
+                else:
+                    ml_gap_ms = (now - self._last_ml_update_wall_time) * 1000
+                    ml_gap_ms = max(300, min(12000, ml_gap_ms))
+                self._last_ml_update_wall_time = now
+
                 self.stat_cards.animate_extended_stats(
-                    cost, trip_time_min, co2, range_left, fuel_l, battery_kwh, duration=1000
+                    cost, trip_time_min, co2, range_left, fuel_l, battery_kwh, duration=int(ml_gap_ms)
                 )
 
         elif msg_type == "genai_update" and update.recommendation:
@@ -419,6 +460,7 @@ class DashboardView(QWidget):
 
     def _reset_trip(self):
         self._last_tick_wall_time = None
+        self._last_ml_update_wall_time = None
         if self._live_worker is not None:
             if self._live_worker.isRunning():
                 self._live_worker.stop()

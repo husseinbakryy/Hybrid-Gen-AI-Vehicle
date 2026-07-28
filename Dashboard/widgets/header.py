@@ -89,7 +89,7 @@ class Header(QWidget):
         self.mute_btn = _MuteIconButton()
 
         self.multiplier_combo = QComboBox()
-        self.multiplier_combo.addItems(["1x", "5x", "10x", "50x"])
+        self.multiplier_combo.addItems(["1x", "5x", "10x", "50x", "100x"])
         self.multiplier_combo.setCurrentIndex(0)
         self.multiplier_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.multiplier_combo.setStyleSheet(f"""

@@ -187,9 +187,13 @@ def compute_tick_energy(
     total_force = rolling_force + aero_force + accel_force
     mechanical_energy_kwh = max(0.0, total_force * distance_m / 3_600_000.0)
 
-    temp_gap = abs(ambient_temp_c - 21.0)
-    hvac_kw = 1.8 * (1.0 + 0.028 * temp_gap)
-    hvac_energy_kwh = hvac_kw * dt_seconds / 3600.0
+    if speed_mps <= 0.01 or distance_m <= 0.001:
+        mechanical_energy_kwh = 0.0
+        hvac_energy_kwh = 0.0
+    else:
+        temp_gap = abs(ambient_temp_c - 21.0)
+        hvac_kw = 1.8 * (1.0 + 0.028 * temp_gap)
+        hvac_energy_kwh = hvac_kw * dt_seconds / 3600.0
 
     total_energy_kwh = mechanical_energy_kwh + hvac_energy_kwh
 

@@ -415,16 +415,20 @@ async def websocket_trip_live(ws: WebSocket):
     try:
         while not sim.is_finished:
             events = sim.tick(wall_dt_seconds=1.0)
-            for ev in events:
-                await ws.send_json({"type": ev.event_type, **ev.data})
-                if ev.event_type == "mode_switch":
-                    logger.info(f"WS EVENT | Mode switched: {ev.data.get('from')} -> {ev.data.get('to')} ({ev.data.get('reason')})")
-                elif ev.event_type == "trip_end":
-                    final_st = ev.data.get("final_state", {})
-                    logger.info(
-                        f"WS TRIP END | Reason: {ev.data.get('reason')} | Dist: {final_st.get('distance_traveled_km', 0.0):.1f}km | "
-                        f"Fuel: {final_st.get('fuel_used_l', 0.0):.2f}L | Battery: {final_st.get('battery_used_kwh', 0.0):.1f}kWh"
-                    )
+            try:
+                for ev in events:
+                    await ws.send_json({"type": ev.event_type, **ev.data})
+                    if ev.event_type == "mode_switch":
+                        logger.info(f"WS EVENT | Mode switched: {ev.data.get('from')} -> {ev.data.get('to')} ({ev.data.get('reason')})")
+                    elif ev.event_type == "trip_end":
+                        final_st = ev.data.get("final_state", {})
+                        logger.info(
+                            f"WS TRIP END | Reason: {ev.data.get('reason')} | Dist: {final_st.get('distance_traveled_km', 0.0):.1f}km | "
+                            f"Fuel: {final_st.get('fuel_used_l', 0.0):.2f}L | Battery: {final_st.get('battery_used_kwh', 0.0):.1f}kWh"
+                        )
+            except (WebSocketDisconnect, RuntimeError):
+                logger.info("[WS] Client disconnected cleanly")
+                break
             await asyncio.sleep(1.0)
     except WebSocketDisconnect:
         logger.info("[WS] Client disconnected")

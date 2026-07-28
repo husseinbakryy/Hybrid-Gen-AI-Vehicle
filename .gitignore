@@ -22,3 +22,14 @@ ENV/
 # OS / Misc
 .DS_Store
 Thumbs.db
+
+# Audio & Generated Speech
+*.mp3
+*.wav
+*.ogg
+*.aac
+*.m4a
+*.flac
+audio_output.mp3
+tts_*.mp3
+Backend/*.mp3

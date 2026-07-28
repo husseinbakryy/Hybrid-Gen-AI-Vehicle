@@ -322,7 +322,8 @@ class DashboardView(QWidget):
             cost_usd = float(state.get("trip_cost_usd", 0.0))
             range_left = float(state.get("range_left_km", 0.0))
 
-            self.stat_cards.fuel_tile.set_value(f"{fuel_l:.2f} L")
+            fuel_fmt = f"{fuel_l:.3f} L" if 0.0 < fuel_l < 1.0 else f"{fuel_l:.2f} L"
+            self.stat_cards.fuel_tile.set_value(fuel_fmt)
             self.stat_cards.battery_tile.set_value(f"{battery_kwh:.1f} kWh")
             self.stat_cards.co2_tile.set_value(f"{co2_kg:.1f}kg")
             self.stat_cards.cost_tile.set_value(f"${cost_usd:.2f}")

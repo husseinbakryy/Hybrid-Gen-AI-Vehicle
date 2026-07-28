@@ -1,3 +1,4 @@
+from typing import Any
 from PyQt6.QtCore import QThread, pyqtSignal
 import trip_logic
 
@@ -13,7 +14,7 @@ class LiveTripWorker(QThread):
         super().__init__(parent)
         self.trip_config = trip_config
         self.base_url = base_url
-        self._ws = None
+        self._ws: Any = None
         self._running = False
 
     def run(self):
@@ -27,7 +28,7 @@ class LiveTripWorker(QThread):
         self._running = True
         while self._running:
             try:
-                raw = self._ws.recv()
+                raw = self._ws.recv()  # pyrefly: ignore [no-attribute]
             except Exception:
                 break
 
@@ -68,5 +69,9 @@ class LiveTripWorker(QThread):
         if self._ws is not None:
             try:
                 trip_logic.stop_live_trip(self._ws)
+            except Exception:
+                pass
+            try:
+                self._ws.close()
             except Exception:
                 pass

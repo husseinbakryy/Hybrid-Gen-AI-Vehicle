@@ -12,17 +12,19 @@ from pydantic import BaseModel, Field
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = Path(__file__).resolve().parent
-load_dotenv(BACKEND_DIR / ".env")
-
 MODELS_DIR = REPO_ROOT / "Models"
-if str(MODELS_DIR) not in sys.path:
-    sys.path.insert(0, str(MODELS_DIR))
+
+for p in (str(REPO_ROOT), str(BACKEND_DIR), str(MODELS_DIR)):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+load_dotenv(BACKEND_DIR / ".env")
 
 from database import fetch_vehicle_by_id, fetch_vehicle_by_make_model, fetch_vehicles, insert_vehicle
 from logger import logger
 from pipeline.inference import predict_trip_structured
-from play_audio import generate_tts_audio, play_audio_file, stop_current_playback
-from recommender import run_recommender_agent
+from play_audio import enqueue_tts, set_muted, stop_current_playback
+from recommender import run_recommender_agent  # pyrefly: ignore [missing-import]
 from trip_simulation import TripSimulation, build_trip_start_announcement
 
 
@@ -83,11 +85,9 @@ app = FastAPI(
 
 def _async_generate_and_play_tts(text: str):
     try:
-        audio_path = generate_tts_audio(text)
-        if audio_path:
-            play_audio_file(audio_path)
+        enqueue_tts(text)
     except Exception as audio_exc:
-        print(f"[TTS] Background audio generation/playback failed: {audio_exc}")
+        print(f"[TTS] Background audio queue failed: {audio_exc}")
 
 
 # pyrefly: ignore [deprecated]

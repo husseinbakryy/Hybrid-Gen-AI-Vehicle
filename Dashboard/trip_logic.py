@@ -12,6 +12,7 @@ Current state: rule-based placeholders (see NOTE comments). Not the real model.
 
 import json
 from datetime import datetime
+from typing import Any
 
 # requests is used to fetch the live vehicle catalog from the teammate backend.
 # Keep this dependency minimal (requests) so the rest of the file remains
@@ -402,7 +403,7 @@ def connect_live_trip(
     config: dict,
     base_url: str = "ws://localhost:8000",
     timeout: float = 30.0,
-) -> object | None:
+) -> Any | None:
     """Open a WebSocket connection to /ws/trip/live and send the initial config.
 
     Parameters
@@ -433,7 +434,7 @@ def connect_live_trip(
         return None
 
 
-def send_pedal_action(ws: object, action: str) -> None:
+def send_pedal_action(ws: Any, action: str) -> None:
     """Send a pedal action (accelerate / brake / coast) to the server."""
     if ws is None:
         return
@@ -443,7 +444,7 @@ def send_pedal_action(ws: object, action: str) -> None:
         pass
 
 
-def send_time_multiplier(ws: object, value: int) -> None:
+def send_time_multiplier(ws: Any, value: int) -> None:
     """Change the simulation time multiplier (1x, 5x, 10x, 50x)."""
     if ws is None:
         return
@@ -453,7 +454,7 @@ def send_time_multiplier(ws: object, value: int) -> None:
         pass
 
 
-def toggle_voice(ws: object, enabled: bool) -> None:
+def toggle_voice(ws: Any, enabled: bool) -> None:
     """Enable or disable TTS voice announcements."""
     if ws is None:
         return
@@ -463,7 +464,7 @@ def toggle_voice(ws: object, enabled: bool) -> None:
         pass
 
 
-def stop_live_trip(ws: object) -> None:
+def stop_live_trip(ws: Any) -> None:
     """Send a stop command and close the WebSocket."""
     if ws is None:
         return

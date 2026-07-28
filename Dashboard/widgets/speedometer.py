@@ -16,7 +16,7 @@ from math import cos, sin, radians
 
 from PyQt6.QtWidgets import QWidget, QSizePolicy
 from PyQt6.QtGui import QPainter, QPen, QFont
-from PyQt6.QtCore import Qt, QRectF
+from PyQt6.QtCore import Qt, QRectF, QPointF
 
 from theme import Colors, Fonts, SpeedometerTheme, Animation
 from animations import animate_value
@@ -127,7 +127,7 @@ class Speedometer(QWidget):
         pen = QPen(Colors.EV_GLOW, SpeedometerTheme.NEEDLE_WIDTH)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
-        painter.drawLine(center, center.__class__(int(x), int(y)))
+        painter.drawLine(center, QPointF(x, y))
 
         painter.setBrush(Colors.EV)
         painter.setPen(Qt.PenStyle.NoPen)

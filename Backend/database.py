@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -134,18 +135,20 @@ def fetch_vehicles(
     query: dict[str, Any] = {}
 
     if make:
-        query["make"] = {"$regex": f"^{make}$", "$options": "i"}
+        query["make"] = {"$regex": f"^{re.escape(make)}$", "$options": "i"}
 
     if body_type:
+        safe_bt = re.escape(body_type)
         query["$or"] = [
-            {"specifications.bodyType": {"$regex": f"^{body_type}$", "$options": "i"}},
-            {"archetype": {"$regex": body_type, "$options": "i"}},
+            {"specifications.bodyType": {"$regex": f"^{safe_bt}$", "$options": "i"}},
+            {"archetype": {"$regex": safe_bt, "$options": "i"}},
         ]
 
     if powertrain_type:
+        safe_pt = re.escape(powertrain_type)
         powertrain_query = [
-            {"specifications.powertrainType": {"$regex": f"^{powertrain_type}$", "$options": "i"}},
-            {"archetype": {"$regex": powertrain_type, "$options": "i"}},
+            {"specifications.powertrainType": {"$regex": f"^{safe_pt}$", "$options": "i"}},
+            {"archetype": {"$regex": safe_pt, "$options": "i"}},
         ]
         if "$or" in query:
             query = {"$and": [{"$or": query.pop("$or")}, {"$or": powertrain_query}]}
@@ -203,8 +206,8 @@ def fetch_vehicle_by_make_model(make: str, model: str) -> dict[str, Any] | None:
         return None
 
     query = {
-        "make": {"$regex": f"^{make}$", "$options": "i"},
-        "model": {"$regex": f"^{model}$", "$options": "i"},
+        "make": {"$regex": f"^{re.escape(make)}$", "$options": "i"},
+        "model": {"$regex": f"^{re.escape(model)}$", "$options": "i"},
     }
     # Retrieve the first document matching make and model
     doc = col.find_one(query)
